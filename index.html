@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="SecureVault — Secure Digital File Exchange Platform. Frontend prototype with AWS S3, Cognito, and Lambda integration readiness.">
+  <title>SecureVault — Secure Digital File Exchange Platform</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Core Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <div class="app-wrapper">
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebarBackdrop" class="modal-backdrop"
+      style="z-index: 95; backdrop-filter: none; background-color: rgba(23,32,51,0.3);"></div>
+
+    <!-- ======================================================================
+         A. Sidebar Navigation
+         ====================================================================== -->
+    <aside id="appSidebar" class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="brand-logo">
+          <div class="brand-icon-wrapper">
+            <!-- Shield Lock SVG Icon -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <rect x="9" y="10" width="6" height="4" rx="1" />
+            </svg>
+          </div>
+          <span>SecureVault</span>
+          <span class="brand-badge">Demo</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Workspace</div>
+
+        <a href="#dashboard" class="nav-item active" data-view="dashboard" id="navItemDashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg>
+          <span>Dashboard</span>
+        </a>
+
+        <a href="#files" class="nav-item" data-view="files" id="navItemFiles">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+          <span>My Files</span>
+        </a>
+
+        <a href="#shared" class="nav-item" data-view="shared" id="navItemShared">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+          <span>Shared Files</span>
+        </a>
+
+        <a href="#activity" class="nav-item" data-view="activity" id="navItemActivity">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <span>Recent Activity</span>
+        </a>
+
+        <div class="nav-section-title" style="margin-top: 14px;">Compliance & Settings</div>
+
+        <a href="#security" class="nav-item" data-view="security" id="navItemSecurity">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>Security</span>
+        </a>
+
+        <a href="#settings" class="nav-item" data-view="settings" id="navItemSettings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar User Profile Footer -->
+      <div class="sidebar-footer">
+        <div class="user-snippet">
+          <div class="user-avatar" id="sidebarUserAvatar">AM</div>
+          <div class="user-info">
+            <div class="user-name" id="sidebarUserName">Alex Mercer</div>
+            <div class="user-role" id="sidebarUserRole">Lead Researcher</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         Main Layout
+         ====================================================================== -->
+    <div class="app-main">
+
+      <!-- B. Top Navigation Bar -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle navigation menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+
+          <nav class="topbar-breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-root">SecureVault</span>
+            <span class="breadcrumb-separator">/</span>
+            <span id="breadcrumbCurrent" class="breadcrumb-current">Dashboard Overview</span>
+          </nav>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Demo Mode Badge -->
+          <div class="demo-mode-tag" title="Operating in client prototype mode with mock service layer">
+            <span class="demo-dot"></span>
+            <span>Demo Mode • S3 Mock</span>
+          </div>
+
+          <!-- Topbar Global Search Input -->
+          <div class="topbar-search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input type="text" id="topbarSearchInput" placeholder="Search files (press Enter)..."
+              aria-label="Search files">
+          </div>
+
+          <!-- Notification Bell with Dropdown -->
+          <div style="position: relative;">
+            <button class="icon-btn" id="topbarNotifTrigger" aria-label="View system notifications"
+              title="Notifications">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <span class="badge-unread" id="notifBadgeDot"></span>
+            </button>
+
+            <div class="profile-dropdown-menu" id="notificationsDropdownMenu" style="width: 300px;">
+              <div class="profile-menu-header"
+                style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="name">Notifications</span>
+                <button id="markAllReadBtn" style="font-size: 0.74rem; color: var(--primary-blue);">Mark all
+                  read</button>
+              </div>
+              <div style="padding: 6px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border-subtle);">
+                <strong>Simulated KMS Key Active</strong>
+                <p style="color: var(--text-muted); font-size: 0.74rem; margin-top: 2px;">AES-256 envelope encryption
+                  ready for AWS KMS backend.</p>
+              </div>
+              <div style="padding: 6px 12px; font-size: 0.8rem;">
+                <strong>Cognito Demo Session</strong>
+                <p style="color: var(--text-muted); font-size: 0.74rem; margin-top: 2px;">Logged in as mock user Alex
+                  Mercer.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile Trigger with Dropdown -->
+          <div class="topbar-profile-container">
+            <div class="profile-trigger" id="topbarProfileTrigger" role="button" tabindex="0" aria-haspopup="true"
+              aria-label="User profile menu">
+              <div class="user-avatar" id="topbarUserAvatar">AM</div>
+              <span id="topbarUserName" style="font-size: 0.88rem; font-weight: 600;">Alex Mercer</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+
+            <div class="profile-dropdown-menu" id="profileDropdownMenu">
+              <div class="profile-menu-header">
+                <div class="name" id="dropdownUserName">Alex Mercer</div>
+                <div class="email" id="dropdownUserEmail">alex.mercer@cyberlab.edu</div>
+              </div>
+              <a href="#settings" class="profile-menu-item" onclick="Navigation.switchView('settings')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Account & API Settings</span>
+              </a>
+              <a href="#security" class="profile-menu-item" onclick="Navigation.switchView('security')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>Security Architecture</span>
+              </a>
+              <button class="profile-menu-item logout" id="logoutButton" style="width: 100%; border: none;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Demo Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Application Views Container -->
+      <main class="content-container">
+
+        <!-- ==================================================================
+             VIEW 1: Dashboard Overview
+             ================================================================== -->
+        <section id="view-dashboard" class="view-section active">
+          <div class="page-header-row">
+            <div class="page-title-group">
+              <h1>Dashboard Overview</h1>
+              <p>Secure Digital File Exchange Platform • AWS Architecture Prototype</p>
+            </div>
+            <div class="page-actions-group">
+              <button class="btn btn-primary btn-trigger-upload">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span>Upload File</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- C. Four Summary Metric Cards -->
+          <div class="metrics-grid">
+            <!-- 1. Total Files -->
+            <div class="metric-card">
+              <div class="metric-card-header">
+                <span class="metric-title">Total Files</span>
+                <div class="metric-icon-box blue">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metricTotalFiles">5</div>
+              <div class="metric-subtitle">
+                <span style="color: var(--color-success); font-weight: 600;">Encrypted</span>
+                <span>in virtual S3 bucket</span>
+              </div>
+            </div>
+
+            <!-- 2. Storage Used -->
+            <div class="metric-card">
+              <div class="metric-card-header">
+                <span class="metric-title">Storage Used</span>
+                <div class="metric-icon-box green">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metricStorageUsed">16.8 MB</div>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="metricQuotaProgressFill" style="width: 17%;"></div>
+              </div>
+              <div class="metric-subtitle" id="metricQuotaText">17% of 100 MB Demo Limit</div>
+            </div>
+
+            <!-- 3. Active Shares -->
+            <div class="metric-card">
+              <div class="metric-card-header">
+                <span class="metric-title">Active Shares</span>
+                <div class="metric-icon-box orange">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metricActiveShares">1</div>
+              <div class="metric-subtitle">
+                <span>Time-limited Presigned Links</span>
+              </div>
+            </div>
+
+            <!-- 4. Recent Activity -->
+            <div class="metric-card">
+              <div class="metric-card-header">
+                <span class="metric-title">Recent Activity</span>
+                <div class="metric-icon-box purple">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metricActivityCount">6</div>
+              <div class="metric-subtitle">
+                <span>Audit events recorded</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dashboard Two Columns: Recent Files & Recent Activity -->
+          <div class="dashboard-columns">
+            <!-- Left: Recent Files Table -->
+            <div class="surface-card">
+              <div class="card-header-toolbar">
+                <h3>Recent Files</h3>
+                <a href="#files" class="btn btn-outline btn-sm" onclick="Navigation.switchView('files')">View All Files
+                  &rarr;</a>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>File Name</th>
+                      <th>Uploaded</th>
+                      <th>Classification</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboardRecentFilesTableBody">
+                    <!-- Injected by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right: Recent Activity Panel -->
+            <div class="surface-card">
+              <div class="card-header-toolbar">
+                <h3>Recent Activity Feed</h3>
+                <a href="#activity" class="btn btn-outline btn-sm" onclick="Navigation.switchView('activity')">View
+                  Audit Log &rarr;</a>
+              </div>
+              <div class="card-body">
+                <div class="activity-list" id="dashboardActivityList">
+                  <!-- Injected by JavaScript -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Integration Notice Banner -->
+          <div
+            style="margin-top: 24px; background-color: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: gap; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <div
+                style="width: 38px; height: 38px; border-radius: var(--radius-md); background-color: var(--bg-subtle-blue); border: 1px solid var(--primary-blue-light); display: flex; align-items: center; justify-content: center; color: var(--primary-blue);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <div>
+                <strong style="font-size: 0.92rem; color: var(--text-main);">AWS Cloud Integration Target</strong>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                  S3 Presigned URLs &bull; KMS SSE-256 Encryption &bull; Cognito JWT Auth &bull; CloudWatch Logs
+                </p>
+              </div>
+            </div>
+            <a href="#security" class="btn btn-secondary btn-sm" onclick="Navigation.switchView('security')">Inspect
+              Architecture</a>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 2: My Files Page
+             ================================================================== -->
+        <section id="view-files" class="view-section">
+          <div class="page-header-row">
+            <div class="page-title-group">
+              <h1>My Files & Storage</h1>
+              <p>Manage, share, download, and audit encrypted digital assets in SecureVault.</p>
+            </div>
+            <div class="page-actions-group">
+              <button class="btn btn-primary btn-trigger-upload">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span>Upload File</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- D. Filter & Search Toolbar -->
+          <div class="filter-toolbar">
+            <div class="filter-left-group">
+              <div class="filter-search-input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input type="text" id="fileSearchInput" placeholder="Filter by filename..."
+                  aria-label="Filter by filename">
+              </div>
+
+              <div class="filter-pills">
+                <button class="filter-pill active" data-filter="all">All Files</button>
+                <button class="filter-pill" data-filter="pdf">PDF</button>
+                <button class="filter-pill" data-filter="doc">Documents</button>
+                <button class="filter-pill" data-filter="archive">Archives</button>
+                <button class="filter-pill" data-filter="text">Text / Code</button>
+              </div>
+            </div>
+
+            <div class="filter-right-group">
+              <label for="fileSortSelect" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">Sort
+                by:</label>
+              <select id="fileSortSelect" class="sort-select">
+                <option value="date-desc">Date: Newest First</option>
+                <option value="date-asc">Date: Oldest First</option>
+                <option value="name-asc">Name: A to Z</option>
+                <option value="name-desc">Name: Z to A</option>
+                <option value="size-desc">Size: Largest First</option>
+                <option value="size-asc">Size: Smallest First</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Files Table Surface -->
+          <div class="surface-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>File Name & Checksum</th>
+                    <th>Size</th>
+                    <th>Uploaded Date</th>
+                    <th>Classification</th>
+                    <th>Storage Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="filesTableBody">
+                  <!-- Injected by JavaScript -->
+                </tbody>
+              </table>
+
+              <!-- Empty State -->
+              <div id="filesEmptyState" class="empty-state-box" style="display: none;">
+                <div class="empty-state-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="9" y1="15" x2="15" y2="15" />
+                  </svg>
+                </div>
+                <div class="empty-state-title">No matching files found</div>
+                <div class="empty-state-subtitle">No files match your search query or filter criteria. Upload a new file
+                  or clear filters.</div>
+                <button class="btn btn-primary btn-sm btn-trigger-upload">Upload File Now</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 3: Shared Files Page
+             ================================================================== -->
+        <section id="view-shared" class="view-section">
+          <div class="page-header-row">
+            <div class="page-title-group">
+              <h1>Shared Files & Links</h1>
+              <p>Manage time-limited presigned URLs. Revoke active links at any time to immediately disable access.</p>
+            </div>
+          </div>
+
+          <div class="surface-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>File Name</th>
+                    <th>Share Created</th>
+                    <th>Expiration Time</th>
+                    <th>Link Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="sharedTableBody">
+                  <!-- Injected by JavaScript -->
+                </tbody>
+              </table>
+
+              <!-- Empty State -->
+              <div id="sharedEmptyState" class="empty-state-box" style="display: none;">
+                <div class="empty-state-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                  </svg>
+                </div>
+                <div class="empty-state-title">No Active Shared Links</div>
+                <div class="empty-state-subtitle">You have not created any temporary shareable links yet. Go to My Files
+                  and click Share on any file.</div>
+                <a href="#files" class="btn btn-primary btn-sm" onclick="Navigation.switchView('files')">Go to My
+                  Files</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 4: Recent Activity Page
+             ================================================================== -->
+        <section id="view-activity" class="view-section">
+          <div class="page-header-row">
+            <div class="page-title-group">
+              <h1>Recent Activity & Audit Trail</h1>
+              <p>Chronological record of file uploads, downloads, sharing events, and simulated access denials.</p>
+            </div>
+            <div class="page-actions-group">
+              <button class="btn btn-secondary btn-sm" id="exportAuditCsvBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Export CSV</span>
+              </button>
+              <button class="btn btn-secondary btn-sm" id="exportAuditJsonBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+                <span>Export JSON</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Activity Filter Pills -->
+          <div class="filter-toolbar">
+            <div class="filter-pills">
+              <button class="filter-pill activity-filter-pill active" data-filter="all">All Actions</button>
+              <button class="filter-pill activity-filter-pill" data-filter="upload">Uploads</button>
+              <button class="filter-pill activity-filter-pill" data-filter="download">Downloads</button>
+              <button class="filter-pill activity-filter-pill" data-filter="share">Shares</button>
+              <button class="filter-pill activity-filter-pill" data-filter="delete">Deletions</button>
+              <button class="filter-pill activity-filter-pill" data-filter="denied">Access Denied</button>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              <span>Target: AWS CloudWatch Logs & AWS CloudTrail</span>
+            </div>
+          </div>
+
+          <!-- Full Audit Table Surface -->
+          <div class="surface-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>Target Resource / Details</th>
+                    <th>Initiator User</th>
+                    <th>Timestamp</th>
+                    <th>Outcome</th>
+                  </tr>
+                </thead>
+                <tbody id="activityTableBody">
+                  <!-- Injected by JavaScript -->
+                </tbody>
+              </table>
+
+              <!-- Empty State -->
+              <div id="activityEmptyState" class="empty-state-box" style="display: none;">
+                <div class="empty-state-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </div>
+                <div class="empty-state-title">No Audit Logs Found</div>
+                <div class="empty-state-subtitle">No activity events match the selected action filter.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 5: Security Page
+             ================================================================== -->
+        <section id="view-security" class="view-section">
+          <div class="page-header-row">
+            <div class="page-title-group">
+              <h1>Security Architecture & Controls</h1>
+              <p>Specification of cloud security mechanisms planned for Amazon Web Services (AWS) deployment.</p>
+            </div>
+            <div class="page-actions-group">
+              <span class="badge badge-restricted" style="font-size: 0.8rem; padding: 6px 12px;">
+                <span class="badge-dot"></span> Architecture Target &bull; Simulated Controls
+              </span>
+            </div>
+          </div>
+
+          <!-- Top Security Notice Banner -->
+          <div class="security-overview-banner">
+            <div class="security-banner-info">
+              <div class="security-shield-large">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <div>
+                <h3>Zero Direct Public S3 Bucket Access</h3>
+                <p>
+                  In this application architecture, all client file traffic passes strictly through short-lived
+                  presigned URLs or authenticated AWS Lambda proxy handlers. The S3 bucket maintains strict "Block
+                  Public Access" policies.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- I. 6 Security Architecture Cards -->
+          <div class="security-grid">
+            <!-- 1. Private Storage -->
+            <div class="security-control-card">
+              <div class="security-card-top">
+                <div class="control-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                  </svg>
+                </div>
+                <span class="badge badge-encrypted"><span class="badge-dot"></span> S3 Target</span>
+              </div>
+              <h4>Private Storage</h4>
+              <p>Amazon S3 Bucket Policy blocks all anonymous read/write operations. Objects are segmented per
+                tenant/user prefix (`uploads/{user_id}/`).</p>
+              <div class="security-card-footer">
+                <span>Enforcement: Bucket Policy</span>
+                <span style="font-weight: 600; color: var(--color-success);">Ready</span>
+              </div>
+            </div>
+
+            <!-- 2. Server-Side Encryption -->
+            <div class="security-control-card">
+              <div class="security-card-top">
+                <div class="control-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <span class="badge badge-encrypted"><span class="badge-dot"></span> AES-256 KMS</span>
+              </div>
+              <h4>Server-Side Encryption</h4>
+              <p>Data at rest is protected with AES-256 envelope encryption via AWS Key Management Service (AWS KMS) or
+                SSE-S3 default bucket encryption.</p>
+              <div class="security-card-footer">
+                <span>Key Rotation: Enabled</span>
+                <span style="font-weight: 600; color: var(--color-success);">Ready</span>
+              </div>
+            </div>
+
+            <!-- 3. Authentication -->
+            <div class="security-control-card">
+              <div class="security-card-top">
+                <div class="control-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="8.5" cy="7" r="4" />
+                    <line x1="20" y1="8" x2="20" y2="14" />
+                    <line x1="23" y1="11" x2="17" y2="11" />
+                  </svg>
+                </div>
+                <span class="badge badge-internal"><span class="badge-dot"></span> Cognito JWT</span>
+              </div>
+              <h4>Identity & Authentication</h4>
+              <p>AWS Cognito User Pools provide OAuth 2.0 / OpenID Connect authentication. JWT tokens validate client
+                requests at API Gateway Lambda authorizers.</p>
+              <div class="security-card-footer">
+                <span>MFA: TOTP Enforced</span>
+                <span style="font-weight: 600; color: var(--primary-blue);">Integration Ready</span>
+              </div>
+            </div>
+
+            <!-- 4. Temporary Presigned Links -->
+            <div class="security-control-card">
+              <div class="security-card-top">
+                <div class="control-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </div>
+                <span class="badge badge-encrypted"><span class="badge-dot"></span> TTL 5–60 min</span>
+              </div>
+              <h4>Temporary Link Sharing</h4>
+              <p>Amazon S3 Pre-signed GET URLs restrict download access to a defined duration (5 to 60 minutes). Expired
+                URLs are automatically rejected by AWS.</p>
+              <div class="security-card-footer">
+                <span>Signed By: Lambda IAM</span>
+                <span style="font-weight: 600; color: var(--color-success);">Simulated in UI</span>
+              </div>
+            </div>
+
+            <!-- 5. Access Control (IAM) -->
+            <div class="security-control-card">
+              <div class="security-card-top">
+                <div class="control-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                  </svg>
+                </div>
+                <span class="badge badge-internal"><span class="badge-dot"></span> Least Privilege</span>
+              </div>
+              <h4>Granular Access Control</h4>
+              <p>IAM execution roles define strict permissions for Lambda functions (e.g., `s3:PutObject`,
+                `s3:GetObject`). Browser JavaScript holds zero IAM credentials.</p>
+              <div class="security-card-footer">
+                <span>Roles: Scoped per Service</span>
+                <span style="font-weight: 600; color: var(--primary-blue);">Designed</span>
+              </div>
+            </div>
+
+            <!-- 6. Audit Logging -->
+            <div class="security-control-card">
+              <div class="security-card-top">
+                <div class="control-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                </div>
+                <span class="badge badge-encrypted"><span class="badge-dot"></span> CloudWatch</span>
+              </div>
+              <h4>Audit Logging & Traceability</h4>
+              <p>AWS CloudTrail records S3 management and data events. Lambda emits structured operational logs into
+                Amazon CloudWatch Logs for audit compliance.</p>
+              <div class="security-card-footer">
+                <span>Retention: 365 Days</span>
+                <span style="font-weight: 600; color: var(--color-success);">Ready</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Architecture Integration Blueprint Diagram -->
+          <div class="architecture-flow-box">
+            <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-main);">AWS Integration Architecture Flow
+            </h3>
+            <p style="font-size: 0.84rem; color: var(--text-muted); margin-top: 2px;">
+              How the frontend connects to backend components implemented by teammates without exposing credentials.
+            </p>
+
+            <div class="architecture-diagram-container">
+              <div class="flow-step-node">
+                <div class="flow-step-number">1</div>
+                <h5>Web Browser Client</h5>
+                <p>Frontend UI runs locally or on S3/CloudFront. Holds zero AWS secrets.</p>
+              </div>
+
+              <div class="flow-arrow">&rarr;</div>
+
+              <div class="flow-step-node">
+                <div class="flow-step-number">2</div>
+                <h5>Amazon Cognito</h5>
+                <p>Authenticates user & issues short-lived JWT ID/Access token.</p>
+              </div>
+
+              <div class="flow-arrow">&rarr;</div>
+
+              <div class="flow-step-node">
+                <div class="flow-step-number">3</div>
+                <h5>API Gateway & Lambda</h5>
+                <p>Validates JWT, enforces business logic, generates presigned S3 URLs.</p>
+              </div>
+
+              <div class="flow-arrow">&rarr;</div>
+
+              <div class="flow-step-node">
+                <div class="flow-step-number">4</div>
+                <h5>Amazon S3 Direct</h5>
+                <p>Browser uploads/downloads file directly via time-limited presigned URL.</p>
+              </div>
+
+              <div class="flow-arrow">&rarr;</div>
+
+              <div class="flow-step-node">
+                <div class="flow-step-number">5</div>
+                <h5>CloudWatch / KMS</h5>
+                <p>Envelope encryption at rest & permanent audit logging trail.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 6: Settings Page
+             ================================================================== -->
+        <section id="view-settings" class="view-section">
+          <div class="page-header-row">
+            <div class="page-title-group">
+              <h1>Settings & AWS Integration</h1>
+              <p>Configure user profile preferences, prototype storage quotas, and AWS backend connection parameters.
+              </p>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <!-- User Profile Settings -->
+            <div class="settings-card">
+              <h3>User Profile Information</h3>
+              <p class="subtitle">Mock identity profile for local testing (No real personal info stored)</p>
+
+              <form id="settingsProfileForm">
+                <div class="form-group">
+                  <label for="settingsUserName">Full Name</label>
+                  <input type="text" id="settingsUserName" required>
+                </div>
+                <div class="form-group">
+                  <label for="settingsUserEmail">Email Address</label>
+                  <input type="email" id="settingsUserEmail" required>
+                </div>
+                <div class="form-group">
+                  <label for="settingsUserDept">Department / Research Lab</label>
+                  <input type="text" id="settingsUserDept">
+                </div>
+                <div class="form-group">
+                  <label>MFA Authentication</label>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                    <span class="badge badge-encrypted"><span class="badge-dot"></span> Enforced via Cognito</span>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);">(Hardware / Authenticator App)</span>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px;">Save Profile
+                  Changes</button>
+              </form>
+            </div>
+
+            <!-- AWS Backend Integration Configuration -->
+            <div class="settings-card">
+              <h3>AWS Backend Endpoints</h3>
+              <p class="subtitle">Configurable targets for teammates connecting real AWS resources</p>
+
+              <form id="settingsAwsForm">
+                <div class="form-group">
+                  <label for="settingsAwsApiUrl">API Gateway Base URL</label>
+                  <input type="text" id="settingsAwsApiUrl"
+                    placeholder="https://abc123.execute-api.us-east-1.amazonaws.com/prod">
+                  <div class="form-helper">Provided by Teammate 1 (File Management Backend)</div>
+                </div>
+                <div class="form-group">
+                  <label for="settingsAwsRegion">AWS Deployment Region</label>
+                  <input type="text" id="settingsAwsRegion" placeholder="us-east-1">
+                </div>
+                <div class="form-group">
+                  <label for="settingsAwsBucket">Amazon S3 Bucket Name</label>
+                  <input type="text" id="settingsAwsBucket" placeholder="securevault-demo-bucket">
+                </div>
+                <div class="form-group">
+                  <label for="settingsAwsCognitoId">Cognito App Client ID</label>
+                  <input type="text" id="settingsAwsCognitoId" placeholder="e.g. 7abcde1234567890">
+                  <div class="form-helper">Provided by Teammate 2 (Security & Authentication)</div>
+                </div>
+                <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Save Endpoints</button>
+              </form>
+            </div>
+
+            <!-- Storage Quota & Limits Info -->
+            <div class="settings-card">
+              <h3>Storage Quota & Parameters</h3>
+              <p class="subtitle">Prototype upload limits and demo quotas</p>
+
+              <div
+                style="background-color: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+                <div
+                  style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">
+                  <span>Demo Storage Allocation</span>
+                  <span>100 MB Quota</span>
+                </div>
+                <div class="progress-bar-container" style="height: 8px;">
+                  <div class="progress-bar-fill" style="width: 17%;"></div>
+                </div>
+                <div
+                  style="display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-muted); margin-top: 6px;">
+                  <span>Max single file upload: 10 MB</span>
+                  <span>Validation: Active</span>
+                </div>
+              </div>
+
+              <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+                Files exceeding 10 MB will be blocked client-side before any upload simulation. In production, AWS API
+                Gateway payload limits and S3 Presigned URL conditions enforce this server-side.
+              </div>
+            </div>
+
+            <!-- Prototype Reset & Maintenance -->
+            <div class="settings-card">
+              <h3>Prototype Maintenance</h3>
+              <p class="subtitle">Reset local storage demo state or re-seed sample records</p>
+
+              <div style="margin-bottom: 16px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+                If you have uploaded custom files, created shares, or want to restore the pristine sample files
+                (`research_report.pdf`, `project_proposal.docx`, etc.), click below.
+              </div>
+
+              <button type="button" class="btn btn-outline btn-sm" id="resetDemoDataBtn"
+                style="color: var(--color-error); border-color: var(--border-error);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+                <span>Reset Demo Data to Defaults</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       E. Upload Modal (Drag and Drop + 10MB Validation)
+       ====================================================================== -->
+  <div id="uploadModal" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Upload File to SecureVault</h3>
+        <button class="modal-close-btn" id="closeUploadModalBtn" aria-label="Close upload modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Hidden real file input -->
+        <input type="file" id="filePickerInput" style="display: none;">
+
+        <!-- Drag-and-Drop Zone -->
+        <div class="dropzone-container" id="uploadDropzone">
+          <div class="dropzone-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <div class="dropzone-title">Click to browse or drag file here</div>
+          <div class="dropzone-subtitle">Supported: PDF, DOCX, PPTX, ZIP, TXT (Maximum file size: 10 MB)</div>
+          <button type="button" class="btn btn-secondary btn-sm" id="browseFilesBtn" style="margin-top: 14px;">Browse
+            Local Files</button>
+        </div>
+
+        <!-- Selected File Preview -->
+        <div class="selected-file-preview" id="uploadFilePreview">
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+            <div class="file-type-icon docx" style="width: 32px; height: 32px;">FILE</div>
+            <div style="min-width: 0;">
+              <div id="previewFileName"
+                style="font-size: 0.86rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px;">
+                filename.pdf</div>
+              <div id="previewFileSize" style="font-size: 0.75rem; color: var(--text-muted);">2.4 MB</div>
+            </div>
+          </div>
+          <span class="badge badge-internal">Ready</span>
+        </div>
+
+        <!-- Validation Error Alert -->
+        <div id="uploadErrorAlert"
+          style="display: none; background-color: var(--bg-error); border: 1px solid var(--border-error); color: var(--color-error); padding: 10px 14px; border-radius: var(--radius-md); font-size: 0.8rem; margin-bottom: 16px;">
+          File size exceeds maximum 10 MB limit.
+        </div>
+
+        <!-- Security Classification Selector -->
+        <div class="form-group">
+          <label for="uploadClassification">Security Classification</label>
+          <select id="uploadClassification">
+            <option value="Confidential">Confidential (Restricted to Authorized Lab Staff)</option>
+            <option value="Restricted">Restricted (Project Core Team Only)</option>
+            <option value="Internal" selected>Internal (General Department Access)</option>
+            <option value="Public">Public (Readily Shareable)</option>
+          </select>
+        </div>
+
+        <!-- Upload Progress Simulation Box -->
+        <div id="uploadProgressBox" style="display: none; margin-top: 18px;">
+          <div class="progress-bar-container" style="height: 8px;">
+            <div class="progress-bar-fill" id="uploadProgressBar" style="width: 0%;"></div>
+          </div>
+          <div class="upload-stage-info">
+            <span id="uploadProgressStatus">Initiating simulated S3 upload...</span>
+            <span id="uploadProgressPercent" style="font-weight: 600;">0%</span>
+          </div>
+        </div>
+
+        <div class="security-notice-box" style="margin-top: 18px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <div>
+            <strong>Demo Mode Indicator:</strong> Upload progress and encryption are simulated locally. No actual file
+            data is transmitted to Amazon S3 in prototype mode.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancelUploadBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="startUploadBtn" disabled>
+          <span>Upload to S3</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       F. Secure Sharing Modal
+       ====================================================================== -->
+  <div id="shareModal" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Generate Secure Share Link</h3>
+        <button class="modal-close-btn" id="closeShareModalBtn" aria-label="Close share modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div
+          style="background-color: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 18px;">
+          <div id="shareModalFileName" style="font-weight: 600; font-size: 0.92rem; color: var(--text-main);">
+            research_report.pdf</div>
+          <div id="shareModalFileMeta" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">2.4 MB •
+            Classification: Confidential</div>
+        </div>
+
+        <div class="form-group">
+          <label for="shareValiditySelect">Link Validity Period (Time-to-Live)</label>
+          <select id="shareValiditySelect">
+            <option value="5">5 Minutes (Maximum Security)</option>
+            <option value="15" selected>15 Minutes (Recommended)</option>
+            <option value="60">1 Hour (Standard Review Window)</option>
+          </select>
+          <div class="form-helper">The link automatically becomes invalid after this window.</div>
+        </div>
+
+        <!-- Generated Link Result Container -->
+        <div id="shareLinkResultContainer" style="display: none; margin-top: 20px;">
+          <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Simulated Presigned S3
+            Link:</label>
+          <div class="copy-link-group">
+            <input type="text" id="generatedShareLinkInput" class="copy-link-input" readonly>
+            <button type="button" class="btn btn-secondary btn-sm" id="copyShareLinkBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              <span>Copy Link</span>
+            </button>
+          </div>
+          <div id="shareExpiryTimestampNotice"
+            style="font-size: 0.75rem; color: var(--color-success); font-weight: 500; margin-top: 6px;">
+            Valid until: 2026-10-11 11:30 (15 minutes TTL)
+          </div>
+        </div>
+
+        <div class="security-notice-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <div>
+            <strong>Simulated S3 Presigned URL:</strong> This prototype generates a simulated URL for interface
+            verification. In production, an authorized AWS Lambda function creates a cryptographically signed S3 GET URL
+            that expires automatically.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancelShareBtn">Done</button>
+        <button type="button" class="btn btn-primary" id="generateLinkBtn">
+          <span>Generate Secure Link</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Delete Confirmation Modal
+       ====================================================================== -->
+  <div id="deleteModal" class="modal-backdrop">
+    <div class="modal-window" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>Delete File Permanently</h3>
+        <button class="modal-close-btn" id="closeDeleteModalBtn" aria-label="Close delete modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; color: var(--text-main); margin-bottom: 12px;">
+          Are you sure you want to delete <strong id="deleteTargetFileName">filename.ext</strong>?
+        </p>
+        <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+          This action will remove the object from storage and invalidate all active shared links. This action cannot be
+          undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Toast Notifications Container
+       ====================================================================== -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- ======================================================================
+       JavaScript Service Layer & Application Scripts
+       ====================================================================== -->
+  <script src="js/services/config.js"></script>
+  <script src="js/services/auth-service.js"></script>
+  <script src="js/services/audit-service.js"></script>
+  <script src="js/services/file-service.js"></script>
+  <script src="js/services/sharing-service.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/file-manager.js"></script>
+  <script src="js/sharing.js"></script>
+  <script src="js/activity.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+
+</html>
