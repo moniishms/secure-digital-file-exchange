@@ -80,185 +80,147 @@ secure-digital-file-exchange/
 
 ## Running Locally
 
-This project has no build step and requires no package installation.
+The project is built entirely with standard web technologies and requires no compilation or package installs.
 
-### Option 1: VS Code Live Server
+### Option A: VS Code Live Server (Recommended)
+1. Open the project folder in **Visual Studio Code**:
+   ```bash
+   code .
+   ```
+2. Install the **Live Server** extension (by Ritwick Dey).
+3. Right-click on `index.html` and select **"Open with Live Server"**.
+4. The application will launch in your browser at `http://127.0.0.1:5500`.
 
-1. Open the project folder in Visual Studio Code:
-
+### Option B: Python Simple HTTP Server
+If Python is installed on your system, run:
 ```bash
-code .
+python -m http.server 5501 --bind 127.0.0.1
 ```
-
-2. Install the Live Server extension.
-3. Right-click `index.html` and select "Open with Live Server".
-4. The app will open locally at `http://127.0.0.1:5500`.
-
-### Option 2: Python HTTP Server
-
-```bash
-python -m http.server 8080
-```
-
-Then open:
-
-```text
-http://localhost:8080
-```
+Then navigate to [http://localhost:8080](http://localhost:8080) in any web browser.
 
 ### Option 3: Node.js local server
 
 ```bash
-npx -y serve -l 3000
+npx -y serve -l 5501
 ```
-
-Then open:
-
-```text
-http://localhost:3000
-```
+Then navigate to [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Demo Mode
+## 6. Explanation of Demo Mode
 
-SecureVault uses demo mode by default because real AWS credentials should never be committed to source control or exposed in browser JavaScript.
-
-Behavior in demo mode:
-
-- files, shares, and audit records are stored in browser `localStorage`
-- no actual AWS credentials or secret keys are stored in the frontend
-- default sample records are preloaded for testing UX and workflows
-- downloads generate structured demo files instead of real remote content
-- settings include a reset option to restore default sample data
-
-Sample demo files include:
-
-- `research_report.pdf`
-- `project_proposal.docx`
-- `presentation.pptx`
-- `dataset.zip`
-- `meeting_notes.txt`
+Because real AWS credentials must never be committed to source control or exposed in browser JavaScript, SecureVault operates in **Demo Mode** by default:
+- **Local Persistence:** Demo files, shares, and activity records are stored in browser `localStorage`.
+- **Zero Sensitive Data:** No real private files, AWS access keys, or secret keys are stored in `localStorage`.
+- **Default Sample Data:** Includes realistic dummy records:
+  - `research_report.pdf` (2.4 MB, Confidential)
+  - `project_proposal.docx` (1.1 MB, Internal)
+  - `presentation.pptx` (4.8 MB, Restricted)
+  - `dataset.zip` (8.5 MB, Confidential)
+  - `meeting_notes.txt` (14 KB, Public)
+- **Safe Simulated Downloads:** Clicking Download generates a local structured demonstration text file confirming file metadata without calling external services.
+- **Factory Reset:** Navigating to **Settings** and clicking **"Reset Demo Data to Defaults"** restores the initial sample state at any time.
 
 ---
 
-## Service Layer Overview
+## 7. Service Layer API Reference
 
-The logic is defined in `js/services/` and is structured for easy backend replacement.
+The service layer is located under `js/services/`. Every service function returns a standard JavaScript `Promise` and contains clear hooks where `fetch()` requests will be plugged in.
 
-### FileService
+### 1. `FileService` (`js/services/file-service.js`)
+| Method | Parameters | Return Type | Description |
+|---|---|---|---|
+| `listFiles()` | None | `Promise<Array<FileObject>>` | Retrieves all files in user storage |
+| `uploadFile(file, classification, onProgress)` | `File`, `string`, `function` | `Promise<FileObject>` | Validates size (<=10 MB), simulates upload stages, records file |
+| `downloadFile(fileId)` | `string` | `Promise<Object>` | Triggers simulated presigned stream download |
+| `deleteFile(fileId)` | `string` | `Promise<boolean>` | Deletes file record and updates audit trail |
 
-| Method | Description |
-|---|---|
-| `listFiles()` | Retrieves files from the current demo storage |
-| `uploadFile(file, classification, onProgress)` | Validates upload size and simulates the upload process |
-| `downloadFile(fileId)` | Creates a mock download response |
-| `deleteFile(fileId)` | Removes the file and updates audit history |
+### 2. `SharingService` (`js/services/sharing-service.js`)
+| Method | Parameters | Return Type | Description |
+|---|---|---|---|
+| `listSharedFiles()` | None | `Promise<Array<ShareObject>>` | Retrieves list of all active and expired shared links |
+| `generateSecureLink(fileId, expiryMinutes)` | `string`, `number` (5, 15, or 60) | `Promise<ShareObject>` | Generates a time-limited secure link record |
+| `revokeShare(shareId)` | `string` | `Promise<boolean>` | Invalidates an active link immediately |
 
-### SharingService
+### 3. `AuthService` (`js/services/auth-service.js`)
+| Method | Parameters | Return Type | Description |
+|---|---|---|---|
+| `getCurrentUser()` | None | `Object` | Returns active user profile |
+| `getAuthToken()` | None | `string` | Returns Bearer token for API Gateway authorization |
+| `login(username, password)` | `string`, `string` | `Promise<Object>` | Authenticates user credentials |
+| `logout()` | None | `Promise<Object>` | Terminates current session |
 
-| Method | Description |
-|---|---|
-| `listSharedFiles()` | Lists active and expired share links |
-| `generateSecureLink(fileId, expiryMinutes)` | Creates a time-limited share record |
-| `revokeShare(shareId)` | Immediately invalidates a share |
-
-### AuthService
-
-| Method | Description |
-|---|---|
-| `getCurrentUser()` | Returns the active mock user |
-| `getAuthToken()` | Returns the bearer token for mock API requests |
-| `login(username, password)` | Authenticates a user in demo mode |
-| `logout()` | Clears the current session |
-
-### AuditService
-
-| Method | Description |
-|---|---|
-| `getAuditLogs()` | Fetches audit events |
-| `logActivity(action, fileName, details, status)` | Records a new system event |
-| `exportLogs(format)` | Exports logs as CSV or JSON |
+### 4. `AuditService` (`js/services/audit-service.js`)
+| Method | Parameters | Return Type | Description |
+|---|---|---|---|
+| `getAuditLogs()` | None | `Promise<Array<LogObject>>` | Retrieves chronological audit events |
+| `logActivity(action, fileName, details, status)` | `string`, `string`, `string`, `string` | `Promise<LogObject>` | Appends a new event to the audit trail |
+| `exportLogs(format)` | `'csv'` or `'json'` | `Promise<void>` | Downloads formatted audit logs file |
 
 ---
 
-## AWS Integration Handoff Guide
+## 8. Planned AWS Integration Points & Handoff Guide
 
-When the backend team is ready, the frontend can be connected to live AWS services.
+When teammates complete the backend services, follow this checklist to switch from Mock Mode to Live AWS Mode:
 
-### Step 1: Configure environment values
+### Step 1: Teammate Configuration
+Open **Settings** in the SecureVault UI (or edit `js/services/config.js`):
+1. Enter the deployed **API Gateway Base URL** (e.g. `https://xyz123.execute-api.us-east-1.amazonaws.com/prod`).
+2. Set the **AWS Region** (e.g. `us-east-1`).
+3. Set the **S3 Bucket Name** (e.g. `securevault-production-storage`).
+4. Set the **Cognito App Client ID**.
 
-Set the following within the settings panel or the config module:
-
-- API Gateway base URL
-- AWS region
-- S3 bucket name
-- Cognito app client ID
-
-### Step 2: Replace mock upload logic with presigned URL flow
-
-The frontend is already structured for a production handoff using a presigned upload flow:
-
+### Step 2: Replacing Mock File Uploads with 2-Step S3 Presigned PUT
+In `js/services/file-service.js`, uncomment the live AWS block in `uploadFile`:
 ```javascript
+// 1. Request presigned PUT URL from API Gateway
 const presignRes = await fetch(`${CONFIG.aws.apiGatewayUrl}/files/presign-upload`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
     Authorization: AuthService.getAuthToken()
   },
-  body: JSON.stringify({
-    filename: file.name,
-    contentType: file.type,
-    size: file.size,
-    classification
-  })
+  body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, classification })
 });
-
 const { uploadUrl, fileId, s3Key } = await presignRes.json();
 
+// 2. Stream directly to S3 via PUT (zero backend bottleneck)
 const xhr = new XMLHttpRequest();
 xhr.open('PUT', uploadUrl, true);
 xhr.setRequestHeader('Content-Type', file.type);
 xhr.upload.onprogress = (e) => {
   if (e.lengthComputable) {
-    onProgress({
-      percentage: Math.round((e.loaded / e.total) * 100),
-      stage: 'Uploading to S3...'
-    });
+    onProgress({ percentage: Math.round((e.loaded / e.total) * 100), stage: 'Uploading to S3...' });
   }
 };
-
 xhr.onload = async () => {
   if (xhr.status === 200) {
+    // 3. Confirm upload with API Gateway to persist metadata
     await fetch(`${CONFIG.aws.apiGatewayUrl}/files/confirm`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: AuthService.getAuthToken()
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: AuthService.getAuthToken() },
       body: JSON.stringify({ fileId, s3Key, filename: file.name })
     });
   }
 };
-
 xhr.send(file);
 ```
 
-### Step 3: Connect Cognito authentication
-
+### Step 3: Integrating AWS Cognito Authentication
+In `js/services/auth-service.js`, connect the Amazon Cognito Identity SDK or AWS Amplify Auth:
 ```javascript
 getAuthToken() {
+  // Returns current Cognito User JWT ID Token
   return `Bearer ${session.getIdToken().getJwtToken()}`;
 }
 ```
 
-### Step 4: Connect audit log API
-
+### Step 4: Connecting AWS CloudWatch Audit Logs
+In `js/services/audit-service.js`, redirect `getAuditLogs()` to:
 ```javascript
 const res = await fetch(`${CONFIG.aws.apiGatewayUrl}/audit-logs`, {
   headers: { Authorization: AuthService.getAuthToken() }
 });
-
 return await res.json();
 ```
 

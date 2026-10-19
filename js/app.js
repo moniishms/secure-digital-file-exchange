@@ -13,7 +13,7 @@ const Toast = {
     this.container = document.getElementById('toastContainer');
   },
 
-  show(title, message, type = 'info', duration = 3500) {
+  show(title, message, type = 'info', duration = 4000) {
     if (!this.container) {
       this.container = document.getElementById('toastContainer');
     }
@@ -71,20 +71,127 @@ const Toast = {
 window.Toast = Toast;
 
 const App = {
+  awsConnectionState: 'unverified', // 'unverified' | 'connected' | 'error' | 'unauthorized'
+  awsConnectionError: null,
+
   async init() {
     Toast.init();
+
+    // Check for Cognito OAuth 2.0 PKCE Callback (?code=...&state=...)
+    if (window.AuthService && AuthService.init) {
+      await AuthService.init();
+    }
+
     this.bindHeaderDropdowns();
     this.bindSettingsForm();
 
     // Initialize submodules
     if (window.Navigation) Navigation.init();
-    if (window.FileManager) FileManager.init();
-    if (window.SharingManager) SharingManager.init();
-    if (window.ActivityManager) ActivityManager.init();
+    if (window.FileManager) {
+      FileManager.init();
+      FileManager.render();
+    }
+    if (window.SharingManager) {
+      SharingManager.init();
+      SharingManager.render();
+    }
+    if (window.ActivityManager) {
+      ActivityManager.init();
+      ActivityManager.render();
+    }
 
     // Render initial views & header profile
     this.renderUserProfile();
     await this.renderDashboard();
+  },
+
+  setAwsConnectionState(state, errorMsg = null) {
+    this.awsConnectionState = state;
+    this.awsConnectionError = errorMsg;
+
+    const isMock = CONFIG.isMockMode();
+    const isAuth = AuthService.isAuthenticated();
+
+    // 1. Topbar Mode Badge
+    const modeBadge = document.getElementById('app-mode-badge');
+    const modeLabel = document.getElementById('app-mode-label');
+
+    if (modeBadge && modeLabel) {
+      modeBadge.classList.remove('mode-mock', 'mode-live-unauth', 'mode-live-verifying', 'mode-live-connected', 'mode-live-error');
+
+      if (isMock) {
+        modeBadge.classList.add('mode-mock');
+        modeLabel.textContent = 'Demo Mode • S3 Mock';
+      } else if (!isAuth) {
+        modeBadge.classList.add('mode-live-unauth');
+        modeLabel.textContent = 'Live AWS (Sign In Required)';
+      } else if (state === 'connected') {
+        modeBadge.classList.add('mode-live-connected');
+        modeLabel.textContent = 'Live AWS (Connected)';
+      } else if (state === 'error') {
+        modeBadge.classList.add('mode-live-error');
+        modeLabel.textContent = 'Live AWS (Unreachable)';
+      } else if (state === 'unauthorized') {
+        modeBadge.classList.add('mode-live-error');
+        modeLabel.textContent = 'Live AWS (Session Expired)';
+      } else {
+        modeBadge.classList.add('mode-live-verifying');
+        modeLabel.textContent = 'Live AWS (Verifying...)';
+      }
+    }
+
+    // 2. Sidebar Brand Badge
+    const brandBadge = document.getElementById('brandAppBadge');
+    if (brandBadge) {
+      if (isMock) {
+        brandBadge.textContent = 'Demo';
+        brandBadge.style.backgroundColor = '#E2E8F0';
+        brandBadge.style.color = '#475569';
+        brandBadge.style.borderColor = '#CBD5E1';
+      } else if (!isAuth) {
+        brandBadge.textContent = 'Live (Sign In)';
+        brandBadge.style.backgroundColor = '#FEF3C7';
+        brandBadge.style.color = '#92400E';
+        brandBadge.style.borderColor = '#FDE68A';
+      } else if (state === 'connected') {
+        brandBadge.textContent = 'AWS Live';
+        brandBadge.style.backgroundColor = '#DCFCE7';
+        brandBadge.style.color = '#15803D';
+        brandBadge.style.borderColor = '#BBF7D0';
+      } else if (state === 'error') {
+        brandBadge.textContent = 'AWS Offline';
+        brandBadge.style.backgroundColor = '#FEE2E2';
+        brandBadge.style.color = '#991B1B';
+        brandBadge.style.borderColor = '#FECACA';
+      } else {
+        brandBadge.textContent = 'AWS Connecting';
+        brandBadge.style.backgroundColor = '#EFF6FF';
+        brandBadge.style.color = '#1D4ED8';
+        brandBadge.style.borderColor = '#BFDBFE';
+      }
+    }
+
+    // 3. Dashboard Integration Notice Banner
+    const bannerTitle = document.getElementById('dashboardIntegrationBannerTitle');
+    const bannerSubtitle = document.getElementById('dashboardIntegrationBannerSubtitle');
+    if (bannerTitle && bannerSubtitle) {
+      if (isMock) {
+        bannerTitle.textContent = 'Operating in Client Prototype Mode';
+        bannerSubtitle.textContent = 'Local mock service layer active • Switch to Live AWS Backend in Settings to connect API Gateway.';
+      } else if (!isAuth) {
+        bannerTitle.textContent = 'Live AWS Backend Selected (Sign In Required)';
+        bannerSubtitle.textContent = `Amazon Cognito authentication required to access private S3 bucket (${CONFIG.aws.s3BucketName}) in ${CONFIG.aws.region}.`;
+      } else if (state === 'connected') {
+        bannerTitle.textContent = `Connected to AWS API Gateway (${CONFIG.aws.region})`;
+        bannerSubtitle.textContent = `S3 Storage: ${CONFIG.aws.s3BucketName} • Cognito JWT Authorizer Active & Verified.`;
+      } else if (state === 'error') {
+        bannerTitle.textContent = 'Live AWS Backend: Connection Unreachable';
+        bannerSubtitle.textContent = errorMsg ? `Gateway Notice: ${errorMsg}` : 'Unable to complete API Gateway request. Check network connection or CORS configuration.';
+      } else {
+        bannerTitle.textContent = 'Verifying AWS API Gateway Connection...';
+        bannerSubtitle.textContent = `Connecting to ${CONFIG.aws.apiGatewayUrl}/files`;
+      }
+    }
   },
 
   bindHeaderDropdowns() {
@@ -119,14 +226,39 @@ const App = {
       if (notifMenu) notifMenu.classList.remove('active');
     });
 
+    // Login buttons (topbar and dropdown)
+    const topbarSignInBtn = document.getElementById('topbarSignInBtn');
+    if (topbarSignInBtn) {
+      topbarSignInBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        AuthService.login();
+      });
+    }
+
+    const dropdownLoginBtn = document.getElementById('loginButton');
+    if (dropdownLoginBtn) {
+      dropdownLoginBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (profileMenu) profileMenu.classList.remove('active');
+        AuthService.login();
+      });
+    }
+
+    // Auth banner sign-in buttons in files view
+    document.querySelectorAll('.btn-login-cognito').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        AuthService.login();
+      });
+    });
+
     // Logout button
     const logoutBtn = document.getElementById('logoutButton');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        await AuthService.logout();
-        Toast.show('Demo Logout', 'Signed out from simulated session. Re-authenticating demo user.', 'info');
         if (profileMenu) profileMenu.classList.remove('active');
+        await AuthService.logout();
       });
     }
 
@@ -143,8 +275,22 @@ const App = {
   },
 
   renderUserProfile() {
+    const isAuth = AuthService.isAuthenticated();
+    const isMock = CONFIG.isMockMode();
     const user = AuthService.getCurrentUser();
-    const initials = user.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+
+    // Determine clean avatar initials
+    let initials = 'AM';
+    if (!isMock && !isAuth) {
+      initials = '--';
+    } else if (user && user.name && user.name !== 'Sign In') {
+      initials = user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    } else if (user && user.email) {
+      initials = user.email.slice(0, 2).toUpperCase();
+    }
+
+    // Update connection status badges
+    this.setAwsConnectionState(this.awsConnectionState, this.awsConnectionError);
 
     // Sidebar user block
     const sbAvatar = document.getElementById('sidebarUserAvatar');
@@ -152,30 +298,92 @@ const App = {
     const sbRole = document.getElementById('sidebarUserRole');
 
     if (sbAvatar) sbAvatar.textContent = initials;
-    if (sbName) sbName.textContent = user.name;
-    if (sbRole) sbRole.textContent = user.role;
+    if (sbName) sbName.textContent = isMock ? user.name : (isAuth ? (user.name || 'Cognito User') : 'Guest');
+    if (sbRole) sbRole.textContent = isMock ? user.role : (isAuth ? (user.role || 'Authenticated') : 'Sign In Required');
 
     // Topbar user trigger
     const tbAvatar = document.getElementById('topbarUserAvatar');
     const tbName = document.getElementById('topbarUserName');
     if (tbAvatar) tbAvatar.textContent = initials;
-    if (tbName) tbName.textContent = user.name;
+    if (tbName) tbName.textContent = isMock ? user.name : (isAuth ? (user.name || 'Cognito User') : 'Sign In');
 
     // Dropdown user header
     const ddName = document.getElementById('dropdownUserName');
     const ddEmail = document.getElementById('dropdownUserEmail');
-    if (ddName) ddName.textContent = user.name;
-    if (ddEmail) ddEmail.textContent = user.email;
+    if (ddName) ddName.textContent = isMock ? user.name : (isAuth ? (user.name || 'Cognito User') : 'Guest Session');
+    if (ddEmail) ddEmail.textContent = isMock ? user.email : (isAuth ? user.email : 'Cognito Authentication Required');
+
+    // Toggle Sign In vs Sign Out buttons in header
+    const topbarSignInBtn = document.getElementById('topbarSignInBtn');
+    const dropdownLoginBtn = document.getElementById('loginButton');
+    const dropdownLogoutBtn = document.getElementById('logoutButton');
+    const logoutLabel = document.getElementById('logoutButtonLabel');
+
+    if (isMock) {
+      if (topbarSignInBtn) topbarSignInBtn.style.display = 'none';
+      if (dropdownLoginBtn) dropdownLoginBtn.style.display = 'none';
+      if (dropdownLogoutBtn) dropdownLogoutBtn.style.display = 'flex';
+      if (logoutLabel) logoutLabel.textContent = 'Demo Reset';
+    } else if (isAuth) {
+      if (topbarSignInBtn) topbarSignInBtn.style.display = 'none';
+      if (dropdownLoginBtn) dropdownLoginBtn.style.display = 'none';
+      if (dropdownLogoutBtn) dropdownLogoutBtn.style.display = 'flex';
+      if (logoutLabel) logoutLabel.textContent = 'Sign Out';
+    } else {
+      if (topbarSignInBtn) topbarSignInBtn.style.display = 'inline-flex';
+      if (dropdownLoginBtn) dropdownLoginBtn.style.display = 'flex';
+      if (dropdownLogoutBtn) dropdownLogoutBtn.style.display = 'none';
+    }
+
+    // Authentication banner in files view
+    const filesAuthBanner = document.getElementById('filesAuthBanner');
+    if (filesAuthBanner) {
+      filesAuthBanner.style.display = (!isMock && !isAuth) ? 'flex' : 'none';
+    }
   },
 
   async renderDashboard() {
-    const files = await FileService.listFiles();
-    const shares = await SharingService.listSharedFiles();
-    const logs = await AuditService.getAuditLogs();
+    let files = [];
+    let shares = [];
+    let logs = [];
+
+    const isAuth = AuthService.isAuthenticated();
+    const isMock = CONFIG.isMockMode();
+
+    if (isMock || isAuth) {
+      try {
+        files = await FileService.listFiles();
+        this.setAwsConnectionState('connected');
+      } catch (err) {
+        console.warn('Dashboard could not load files:', err.message);
+        if (!isMock) {
+          this.setAwsConnectionState(isAuth ? 'error' : 'unauthorized', err.message);
+        }
+      }
+    } else {
+      this.setAwsConnectionState('unauthorized');
+    }
+
+    try {
+      shares = await SharingService.listSharedFiles();
+    } catch (err) {
+      console.warn('Dashboard could not load shares:', err.message);
+    }
+
+    try {
+      logs = await AuditService.getAuditLogs();
+    } catch (err) {
+      console.warn('Dashboard could not load audit logs:', err.message);
+    }
 
     // 1. Metric: Total Files
     const totalFilesEl = document.getElementById('metricTotalFiles');
     if (totalFilesEl) totalFilesEl.textContent = files.length;
+
+    const metric1Subtitle = document.getElementById('metric1Subtitle');
+    if (metric1Subtitle) {
+      metric1Subtitle.textContent = isMock ? 'in virtual S3 bucket' : `in AWS S3 (${CONFIG.aws.s3BucketName})`;
+    }
 
     // 2. Metric: Storage Used
     const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
@@ -188,7 +396,10 @@ const App = {
 
     if (storageUsedEl) storageUsedEl.textContent = FileService.formatBytes(totalBytes);
     if (quotaFillEl) quotaFillEl.style.width = `${percentage}%`;
-    if (quotaTextEl) quotaTextEl.textContent = `${percentage}% of ${CONFIG.limits.storageQuotaBytes / (1024*1024)} MB Demo Limit`;
+    if (quotaTextEl) {
+      const quotaMb = Math.round(quotaBytes / (1024 * 1024));
+      quotaTextEl.textContent = `${percentage}% of ${quotaMb} MB ${isMock ? 'Demo Limit' : 'Storage Quota'}`;
+    }
 
     // 3. Metric: Active Shares
     const activeSharesCount = shares.filter(s => s.status === 'Active').length;
@@ -204,7 +415,10 @@ const App = {
     if (recentTableBody) {
       const topRecent = files.slice(0, 4);
       if (topRecent.length === 0) {
-        recentTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No files uploaded yet. Click Upload File to begin.</td></tr>`;
+        const msg = (!isMock && !isAuth)
+          ? 'Cognito authentication required. Sign in to view files stored in AWS S3.'
+          : 'No files stored in this vault yet. Click Upload File to begin.';
+        recentTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">${msg}</td></tr>`;
       } else {
         recentTableBody.innerHTML = topRecent.map(file => {
           const ext = file.extension ? file.extension.toUpperCase() : 'FILE';
@@ -258,11 +472,12 @@ const App = {
       } else {
         dashboardActivityList.innerHTML = topLogs.map(log => {
           let iconType = 'upload';
-          const actLower = log.action.toLowerCase();
+          const actLower = (log.action || '').toLowerCase();
           if (actLower.includes('download')) iconType = 'download';
           else if (actLower.includes('share')) iconType = 'share';
           else if (actLower.includes('delete')) iconType = 'delete';
           else if (actLower.includes('denied')) iconType = 'denied';
+          else if (actLower.includes('login') || actLower.includes('init')) iconType = 'share';
 
           return `
             <div class="activity-item">
@@ -284,7 +499,7 @@ const App = {
   },
 
   bindSettingsForm() {
-    // Populate form values from Config & AuthService
+    // Populate Profile form
     const user = AuthService.getCurrentUser();
     const nameInput = document.getElementById('settingsUserName');
     const emailInput = document.getElementById('settingsUserEmail');
@@ -295,20 +510,34 @@ const App = {
     if (deptInput) deptInput.value = user.department || '';
 
     // AWS Config inputs
+    const modeSelect = document.getElementById('settingsAppMode');
     const apiInput = document.getElementById('settingsAwsApiUrl');
     const regionInput = document.getElementById('settingsAwsRegion');
     const bucketInput = document.getElementById('settingsAwsBucket');
+    const poolIdInput = document.getElementById('settingsAwsCognitoPoolId');
     const cognitoInput = document.getElementById('settingsAwsCognitoId');
+    const domainInput = document.getElementById('settingsAwsCognitoDomain');
+    const redirectInput = document.getElementById('settingsAwsRedirectUri');
+    const logoutInput = document.getElementById('settingsAwsLogoutUri');
+    const tokenTypeSelect = document.getElementById('settingsAwsTokenType');
 
+    const defaultRedirect = window.location.origin + window.location.pathname;
+
+    if (modeSelect) modeSelect.value = CONFIG.appMode || 'live';
     if (apiInput) apiInput.value = CONFIG.aws.apiGatewayUrl || '';
-    if (regionInput) regionInput.value = CONFIG.aws.region || 'us-east-1';
-    if (bucketInput) bucketInput.value = CONFIG.aws.s3BucketName || 'securevault-demo-bucket';
+    if (regionInput) regionInput.value = CONFIG.aws.region || 'ap-south-1';
+    if (bucketInput) bucketInput.value = CONFIG.aws.s3BucketName || 'securevault-files-2026-ms-7391';
+    if (poolIdInput) poolIdInput.value = CONFIG.aws.cognitoPoolId || '';
     if (cognitoInput) cognitoInput.value = CONFIG.aws.cognitoClientId || '';
+    if (domainInput) domainInput.value = CONFIG.aws.cognitoDomain || '';
+    if (redirectInput) redirectInput.value = CONFIG.aws.redirectUri || defaultRedirect;
+    if (logoutInput) logoutInput.value = CONFIG.aws.logoutUri || defaultRedirect;
+    if (tokenTypeSelect) tokenTypeSelect.value = CONFIG.aws.tokenType || 'id_token';
 
     // Save Profile Form
     const profileForm = document.getElementById('settingsProfileForm');
     if (profileForm) {
-      profileForm.addEventListener('submit', (e) => {
+      profileForm.onsubmit = (e) => {
         e.preventDefault();
         AuthService.updateProfile({
           name: nameInput.value.trim(),
@@ -317,28 +546,50 @@ const App = {
         });
         this.renderUserProfile();
         Toast.show('Profile Updated', 'User profile information updated locally.', 'success');
-      });
+      };
     }
 
     // Save AWS Integration Settings Form
     const awsForm = document.getElementById('settingsAwsForm');
     if (awsForm) {
-      awsForm.addEventListener('submit', (e) => {
+      awsForm.onsubmit = (e) => {
         e.preventDefault();
+
+        const newAppMode = modeSelect ? modeSelect.value : CONFIG.appMode;
+
         CONFIG.updateAwsConfig({
+          appMode: newAppMode,
           apiGatewayUrl: apiInput.value.trim(),
           region: regionInput.value.trim(),
           s3BucketName: bucketInput.value.trim(),
-          cognitoClientId: cognitoInput.value.trim()
+          cognitoPoolId: poolIdInput ? poolIdInput.value.trim() : '',
+          cognitoClientId: cognitoInput.value.trim(),
+          cognitoDomain: domainInput ? domainInput.value.trim() : '',
+          redirectUri: redirectInput ? redirectInput.value.trim() : '',
+          logoutUri: logoutInput ? logoutInput.value.trim() : '',
+          tokenType: tokenTypeSelect ? tokenTypeSelect.value : 'id_token'
         });
-        Toast.show('Integration Config Saved', 'AWS backend endpoints saved for service calls.', 'success');
-      });
+
+        // Reset connection verification status on config change
+        this.awsConnectionState = 'unverified';
+        this.renderUserProfile();
+        this.renderDashboard();
+        if (window.FileManager) FileManager.render();
+        if (window.SharingManager) SharingManager.render();
+        if (window.ActivityManager) ActivityManager.render();
+
+        Toast.show(
+          'Configuration Saved',
+          `Application settings updated (${newAppMode === 'live' ? 'Live AWS Backend' : 'Mock Demo Mode'}).`,
+          'success'
+        );
+      };
     }
 
     // Reset Demo Data Button
     const resetBtn = document.getElementById('resetDemoDataBtn');
     if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
+      resetBtn.onclick = () => {
         if (confirm('Reset all demo data back to factory defaults? This will restore sample files, shared links, and activity logs.')) {
           FileService.resetToDefaults();
           SharingService.resetToDefaults();
@@ -349,7 +600,23 @@ const App = {
           if (window.ActivityManager) ActivityManager.render();
           Toast.show('Reset Complete', 'Demo data restored to initial factory sample state.', 'info');
         }
-      });
+      };
+    }
+
+    // Restore Default AWS Endpoints Button
+    const resetAwsBtn = document.getElementById('resetAwsConfigBtn');
+    if (resetAwsBtn) {
+      resetAwsBtn.onclick = () => {
+        if (confirm('Restore default AWS configuration settings (API Gateway, S3 Bucket, ap-south-1)?')) {
+          CONFIG.resetToDefaults();
+          this.bindSettingsForm();
+          this.awsConnectionState = 'unverified';
+          this.renderUserProfile();
+          this.renderDashboard();
+          if (window.FileManager) FileManager.render();
+          Toast.show('AWS Config Restored', 'AWS endpoint defaults restored.', 'info');
+        }
+      };
     }
   }
 };

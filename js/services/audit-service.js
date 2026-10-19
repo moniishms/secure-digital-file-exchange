@@ -1,23 +1,24 @@
 /**
- * SecureVault - Audit & Activity Service (Mock / Integration Ready)
+ * SecureVault - Audit & Activity Service (Security Trail & Logging)
  * 
  * Provides an audit trail of file transactions, access events, and security alerts.
  * 
- * AWS Integration Target:
- * - In production, file lifecycle events are emitted by Lambda to Amazon CloudWatch Logs.
- * - S3 Object-level operations (GetObject, PutObject, DeleteObject) are logged via AWS CloudTrail into a secure S3 bucket.
- * - This service will query an API Gateway endpoint (e.g. GET /audit-logs) backed by CloudWatch Insights or Athena.
+ * Backend Architecture Context:
+ * - Person 3 implemented CloudWatch audit logging in a separate Express app for log group /secure-file-sharing/audit.
+ * - Person 2's API Gateway does not expose /audit or /audit-logs routes (returns 404).
+ * - This service captures client-side events, maintains persistent compliance history,
+ *   and provides CSV/JSON exports.
  */
 
 const AuditService = {
-  // Realistic initial sample activities (including simulated denied access)
+  // Initial realistic sample activities
   _defaultLogs: [
     {
       id: "log_101",
       action: "Access Denied",
       fileName: "financial_forecast_q4.pdf",
       user: "Unknown (IP: 198.51.100.44)",
-      timestamp: "2026-10-11 09:12",
+      timestamp: "2026-10-18 09:12",
       status: "Denied",
       details: "Simulated S3 Bucket Policy blocked unauthenticated public GET attempt"
     },
@@ -26,16 +27,16 @@ const AuditService = {
       action: "Share Created",
       fileName: "project_proposal.docx",
       user: "Alex Mercer",
-      timestamp: "2026-10-11 10:15",
+      timestamp: "2026-10-18 10:15",
       status: "Success",
-      details: "Generated simulated presigned URL (TTL: 60m)"
+      details: "Generated simulated presigned URL (TTL: 5m)"
     },
     {
       id: "log_103",
       action: "Download",
       fileName: "research_report.pdf",
       user: "Alex Mercer",
-      timestamp: "2026-10-10 16:40",
+      timestamp: "2026-10-18 16:40",
       status: "Success",
       details: "Authenticated file download via presigned token"
     },
@@ -44,7 +45,7 @@ const AuditService = {
       action: "Upload",
       fileName: "research_report.pdf",
       user: "Alex Mercer",
-      timestamp: "2026-10-10 14:32",
+      timestamp: "2026-10-18 14:32",
       status: "Success",
       details: "Uploaded with Confidential classification & KMS encryption"
     },
@@ -53,7 +54,7 @@ const AuditService = {
       action: "Delete",
       fileName: "old_draft_notes.txt",
       user: "Alex Mercer",
-      timestamp: "2026-10-09 13:05",
+      timestamp: "2026-10-17 13:05",
       status: "Success",
       details: "File removed permanently from S3 bucket"
     },
@@ -62,9 +63,9 @@ const AuditService = {
       action: "Access Denied",
       fileName: "confidential_keys.pem",
       user: "Ext-Client (IP: 203.0.113.19)",
-      timestamp: "2026-10-08 22:18",
+      timestamp: "2026-10-16 22:18",
       status: "Denied",
-      details: "WAF rule blocked request with expired authorization header"
+      details: "JWT authorizer blocked request with missing bearer token"
     }
   ],
 
@@ -73,36 +74,46 @@ const AuditService = {
    * @returns {Promise<Array>}
    */
   async getAuditLogs() {
-    if (CONFIG.isMockMode()) {
-      const stored = localStorage.getItem('sv_mock_logs');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Error reading stored logs", e);
-        }
+    const storageKey = CONFIG.isMockMode() ? 'sv_mock_logs' : 'sv_live_logs';
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error("Error reading stored logs", e);
       }
+    }
+
+    if (CONFIG.isMockMode()) {
       localStorage.setItem('sv_mock_logs', JSON.stringify(this._defaultLogs));
       return [...this._defaultLogs];
     }
 
-    // AWS Integration:
-    // const res = await fetch(`${CONFIG.aws.apiGatewayUrl}/audit-logs`, {
-    //   headers: { Authorization: AuthService.getAuthToken() }
-    // });
-    // return await res.json();
-    throw new Error("AWS CloudWatch integration pending backend deployment.");
+    // In Live Mode, seed with initial session notice if empty
+    const initialLiveLogs = [
+      {
+        id: "log_live_01",
+        action: "System Init",
+        fileName: "SecureFileExchangeAPI",
+        user: "System",
+        timestamp: FileService.getCurrentTimestamp ? FileService.getCurrentTimestamp() : new Date().toISOString().replace('T', ' ').slice(0, 16),
+        status: "Success",
+        details: "Live AWS Backend active (ap-south-1). CloudWatch audit group: /secure-file-sharing/audit"
+      }
+    ];
+    localStorage.setItem('sv_live_logs', JSON.stringify(initialLiveLogs));
+    return initialLiveLogs;
   },
 
   /**
    * Records a new activity event
-   * @param {string} action 'Upload' | 'Download' | 'Share Created' | 'Share Revoked' | 'Delete' | 'Access Denied'
+   * @param {string} action 'Upload' | 'Download' | 'Share Created' | 'Share Revoked' | 'Delete' | 'Access Denied' | 'Login' | 'Logout'
    * @param {string} fileName 
    * @param {string} details 
    * @param {string} status 'Success' | 'Denied' | 'Warning'
    */
   async logActivity(action, fileName, details = '', status = 'Success') {
-    const user = window.AuthService ? AuthService.getCurrentUser().name : "Alex Mercer";
+    const user = window.AuthService ? AuthService.getCurrentUser().name : "User";
     const pad = (n) => String(n).padStart(2, '0');
     const now = new Date();
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -117,19 +128,11 @@ const AuditService = {
       details: details || "Action executed via SecureVault client"
     };
 
-    if (CONFIG.isMockMode()) {
-      const logs = await this.getAuditLogs();
-      const updated = [newLog, ...logs];
-      localStorage.setItem('sv_mock_logs', JSON.stringify(updated));
-      return newLog;
-    }
-
-    // AWS Integration:
-    // await fetch(`${CONFIG.aws.apiGatewayUrl}/audit-logs`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json', Authorization: AuthService.getAuthToken() },
-    //   body: JSON.stringify(newLog)
-    // });
+    const storageKey = CONFIG.isMockMode() ? 'sv_mock_logs' : 'sv_live_logs';
+    const logs = await this.getAuditLogs();
+    const updated = [newLog, ...logs];
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    return newLog;
   },
 
   /**
@@ -178,6 +181,7 @@ const AuditService = {
    */
   resetToDefaults() {
     localStorage.setItem('sv_mock_logs', JSON.stringify(this._defaultLogs));
+    localStorage.removeItem('sv_live_logs');
     return [...this._defaultLogs];
   }
 };

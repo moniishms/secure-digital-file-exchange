@@ -1,17 +1,15 @@
 /**
- * SecureVault - Sharing Service (Mock / Integration Ready)
+ * SecureVault - Sharing Service (Time-Limited Presigned URLs)
  * 
  * Manages time-limited secure shareable links.
  * 
- * AWS Integration Target:
- * - Real secure sharing uses Amazon S3 Presigned GET URLs with `ExpiresIn` set between 300 to 3600 seconds.
- * - The backend Lambda signs the request using the IAM execution role credentials without exposing AWS keys.
- * - S3 automatically rejects any request received after the expiration timestamp.
- * - Revocation is recorded in DynamoDB to invalidate links at an API Gateway Lambda authorizer layer.
+ * Backend Architecture Context:
+ * - Current deployed API Gateway (SecureVaultAPI) routes: GET /files, POST /files, DELETE /files/{fileId}.
+ * - Generating real temporary S3 presigned URLs requires a backend route (such as POST /files/{fileId}/share or POST /shares).
+ * - Live AWS mode strictly avoids simulating fake S3 presigned URLs.
  */
 
 const SharingService = {
-  // Initial demo shared links
   _defaultShares: [
     {
       id: "share_s01",
@@ -19,11 +17,11 @@ const SharingService = {
       fileName: "research_report.pdf",
       fileSize: "2.4 MB",
       classification: "Confidential",
-      createdDate: "2026-10-11 08:30",
-      expiresDate: "2026-10-11 09:30",
-      expiryMinutes: 60,
-      status: "Expired", // Expired for demo realism
-      simulatedUrl: "https://securevault-demo.local/s3/presigned-get?file=research_report.pdf&token=sv_exp_7f8a9b&expires=1760175000",
+      createdDate: "2026-10-18 08:30",
+      expiresDate: "2026-10-18 08:35",
+      expiryMinutes: 5,
+      status: "Expired",
+      simulatedUrl: "https://securevault-files-2026-ms-7391.s3.ap-south-1.amazonaws.com/shares/research_report.pdf?X-Amz-Expires=300",
       revoked: false
     },
     {
@@ -32,11 +30,11 @@ const SharingService = {
       fileName: "project_proposal.docx",
       fileSize: "1.1 MB",
       classification: "Internal",
-      createdDate: "2026-10-11 10:15",
-      expiresDate: "2026-10-11 11:15",
-      expiryMinutes: 60,
+      createdDate: "2026-10-18 10:15",
+      expiresDate: "2026-10-18 10:20",
+      expiryMinutes: 5,
       status: "Active",
-      simulatedUrl: "https://securevault-demo.local/s3/presigned-get?file=project_proposal.docx&token=sv_exp_2c4d6e&expires=1760181300",
+      simulatedUrl: "https://securevault-files-2026-ms-7391.s3.ap-south-1.amazonaws.com/shares/project_proposal.docx?X-Amz-Expires=300",
       revoked: false
     }
   ],
@@ -61,39 +59,51 @@ const SharingService = {
         try {
           return JSON.parse(stored);
         } catch (e) {
-          console.error("Error parsing stored mock shares", e);
+          console.error("Error parsing stored shares", e);
         }
       }
       localStorage.setItem('sv_mock_shares', JSON.stringify(this._defaultShares));
       return [...this._defaultShares];
     }
 
-    // AWS Integration:
-    // const res = await fetch(`${CONFIG.aws.apiGatewayUrl}/shares`, {
-    //   headers: { Authorization: AuthService.getAuthToken() }
-    // });
-    // return await res.json();
-    throw new Error("AWS API integration pending configuration.");
+    // In Live Mode: only show links if a dedicated backend route is deployed
+    const stored = localStorage.getItem('sv_live_shares');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error("Error parsing stored live shares", e);
+      }
+    }
+    return [];
   },
 
   /**
-   * Generates a simulated secure presigned link
+   * Generates a secure presigned link or tracks it locally in Mock mode
    * @param {string} fileId 
-   * @param {number} expiryMinutes 5, 15, or 60
-   * @returns {Promise<Object>} Share metadata and simulated link
+   * @param {number} expiryMinutes Default 5 minutes
+   * @returns {Promise<Object>} Share metadata and link
    */
-  async generateSecureLink(fileId, expiryMinutes = 15) {
-    const files = await FileService.listFiles();
-    const targetFile = files.find(f => f.id === fileId);
-
-    if (!targetFile) {
-      throw new Error("Target file not found.");
+  async generateSecureLink(fileId, expiryMinutes = 5) {
+    // In Live Mode: Do not simulate presigned URLs or call nonexistent endpoints
+    if (!CONFIG.isMockMode()) {
+      throw new Error(
+        "Presigned share link generation requires an AWS backend endpoint (e.g., POST /files/{fileId}/share or POST /shares) which is not yet deployed on SecureVaultAPI. Live AWS mode does not fabricate mock S3 presigned URLs."
+      );
     }
 
-    const minutesNum = parseInt(expiryMinutes, 10) || 15;
+    const files = await FileService.listFiles();
+    const targetFile = files.find(f => (f.id === fileId || f.fileId === fileId));
+
+    if (!targetFile) {
+      throw new Error("Target file not found for sharing.");
+    }
+
+    const minutesNum = parseInt(expiryMinutes, 10) || 5;
     const expiresDate = this.getExpirationDateString(minutesNum);
-    const token = "sv_demo_" + Math.random().toString(36).substring(2, 10);
-    const simulatedUrl = `https://securevault-demo.local/s3/presigned-get?file=${encodeURIComponent(targetFile.name)}&token=${token}&expires_in=${minutesNum}m`;
+    const storageKey = 'sv_mock_shares';
+
+    const shareUrl = `https://${CONFIG.aws.s3BucketName}.s3.${CONFIG.aws.region}.amazonaws.com/${targetFile.s3Key || targetFile.name}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=${minutesNum * 60}`;
 
     const newShare = {
       id: "share_" + Math.random().toString(36).substring(2, 9),
@@ -105,32 +115,24 @@ const SharingService = {
       expiresDate: expiresDate,
       expiryMinutes: minutesNum,
       status: "Active",
-      simulatedUrl: simulatedUrl,
+      simulatedUrl: shareUrl,
       revoked: false
     };
 
-    if (CONFIG.isMockMode()) {
-      const shares = await this.listSharedFiles();
-      const updated = [newShare, ...shares];
-      localStorage.setItem('sv_mock_shares', JSON.stringify(updated));
+    const shares = await this.listSharedFiles();
+    const updated = [newShare, ...shares];
+    localStorage.setItem(storageKey, JSON.stringify(updated));
 
-      if (window.AuditService) {
-        AuditService.logActivity('Share Created', targetFile.name, `Temporary link valid for ${minutesNum} min (${expiresDate})`, 'Success');
-      }
-
-      return newShare;
+    if (window.AuditService) {
+      AuditService.logActivity(
+        'Share Created',
+        targetFile.name,
+        `Demo presigned link generated (${minutesNum}m expiration)`,
+        'Success'
+      );
     }
 
-    // AWS Integration:
-    // const res = await fetch(`${CONFIG.aws.apiGatewayUrl}/shares/generate`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     Authorization: AuthService.getAuthToken()
-    //   },
-    //   body: JSON.stringify({ fileId, expirySeconds: minutesNum * 60 })
-    // });
-    // return await res.json();
+    return newShare;
   },
 
   /**
@@ -139,6 +141,13 @@ const SharingService = {
    * @returns {Promise<boolean>}
    */
   async revokeShare(shareId) {
+    if (!CONFIG.isMockMode()) {
+      throw new Error(
+        "Share revocation requires a backend API route (e.g., DELETE /shares/{shareId}) which is not yet implemented on the deployed API Gateway."
+      );
+    }
+
+    const storageKey = 'sv_mock_shares';
     const shares = await this.listSharedFiles();
     const targetIndex = shares.findIndex(s => s.id === shareId);
 
@@ -146,24 +155,20 @@ const SharingService = {
       throw new Error("Shared link record not found.");
     }
 
-    if (CONFIG.isMockMode()) {
-      shares[targetIndex].status = "Revoked";
-      shares[targetIndex].revoked = true;
-      localStorage.setItem('sv_mock_shares', JSON.stringify(shares));
+    shares[targetIndex].status = "Revoked";
+    shares[targetIndex].revoked = true;
+    localStorage.setItem(storageKey, JSON.stringify(shares));
 
-      if (window.AuditService) {
-        AuditService.logActivity('Share Revoked', shares[targetIndex].fileName, `Access revoked for share #${shareId}`, 'Success');
-      }
-
-      return true;
+    if (window.AuditService) {
+      AuditService.logActivity(
+        'Share Revoked',
+        shares[targetIndex].fileName,
+        `Revoked sharing access for link #${shareId}`,
+        'Success'
+      );
     }
 
-    // AWS Integration:
-    // await fetch(`${CONFIG.aws.apiGatewayUrl}/shares/${shareId}/revoke`, {
-    //   method: 'POST',
-    //   headers: { Authorization: AuthService.getAuthToken() }
-    // });
-    // return true;
+    return true;
   },
 
   /**
@@ -171,6 +176,7 @@ const SharingService = {
    */
   resetToDefaults() {
     localStorage.setItem('sv_mock_shares', JSON.stringify(this._defaultShares));
+    localStorage.removeItem('sv_live_shares');
     return [...this._defaultShares];
   }
 };

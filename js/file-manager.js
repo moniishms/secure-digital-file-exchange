@@ -278,7 +278,7 @@ const FileManager = {
     if (['xls', 'xlsx', 'csv'].includes(ext)) return 'sheet';
     if (['ppt', 'pptx'].includes(ext)) return 'presentation';
     if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) return 'archive';
-    if (['txt', 'md', 'json', 'js', 'py', 'html', 'css'].includes(ext)) return 'text';
+    if (['txt', 'json', 'js', 'html', 'css', 'py', 'md', 'xml', 'yaml', 'yml'].includes(ext)) return 'text';
     return 'other';
   },
 
@@ -287,7 +287,46 @@ const FileManager = {
     const emptyState = document.getElementById('filesEmptyState');
     if (!tableBody) return;
 
-    let files = await FileService.listFiles();
+    // Show loading state if in Live mode or fetching
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
+          <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem;">
+            <span class="demo-dot" style="background-color: var(--primary-blue);"></span>
+            <span>Loading files from ${CONFIG.isMockMode() ? 'local demo storage' : 'AWS S3'}...</span>
+          </div>
+        </td>
+      </tr>
+    `;
+
+    let files = [];
+    try {
+      files = await FileService.listFiles();
+      if (window.App && App.setAwsConnectionState) {
+        App.setAwsConnectionState('connected');
+      }
+    } catch (err) {
+      console.warn('FileManager.render error:', err.message);
+      const isUnauth = !CONFIG.isMockMode() && !AuthService.isAuthenticated();
+      if (window.App && App.setAwsConnectionState) {
+        App.setAwsConnectionState(isUnauth ? 'unauthorized' : 'error', err.message);
+      }
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 40px 16px;">
+            <div style="color: ${isUnauth ? 'var(--primary-blue)' : 'var(--color-error)'}; font-weight: 600; font-size: 0.95rem; margin-bottom: 6px;">
+              ${isUnauth ? 'Cognito Authentication Required' : 'AWS Backend Request Error'}
+            </div>
+            <div style="font-size: 0.84rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 16px auto; line-height: 1.5;">
+              ${err.message}
+            </div>
+            ${isUnauth ? '<button type="button" class="btn btn-primary btn-sm btn-login-cognito" onclick="AuthService.login()">Sign In with Cognito</button>' : ''}
+          </td>
+        </tr>
+      `;
+      if (emptyState) emptyState.style.display = 'none';
+      return;
+    }
 
     // 1. Search filter
     if (this.searchQuery) {
@@ -374,8 +413,13 @@ const FileManager = {
 
   async triggerDownload(fileId) {
     try {
-      await FileService.downloadFile(fileId);
-      Toast.show('Secure Download', 'Download initiated via simulated presigned stream.', 'success');
+      const res = await FileService.downloadFile(fileId);
+      const isMock = CONFIG.isMockMode();
+      Toast.show(
+        'Secure Download',
+        isMock ? 'Download initiated (simulated demo stream).' : `Download started for ${res.fileName || 'file'}.`,
+        'success'
+      );
       if (window.App) App.renderDashboard();
     } catch (err) {
       Toast.show('Download Failed', err.message, 'error');
