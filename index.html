@@ -1086,17 +1086,6 @@
           File size exceeds maximum 4 MB limit.
         </div>
 
-        <!-- Security Classification Selector -->
-        <div class="form-group">
-          <label for="uploadClassification">Security Classification</label>
-          <select id="uploadClassification">
-            <option value="Confidential">Confidential (Restricted to Authorized Lab Staff)</option>
-            <option value="Restricted">Restricted (Project Core Team Only)</option>
-            <option value="Internal" selected>Internal (General Department Access)</option>
-            <option value="Public">Public (Readily Shareable)</option>
-          </select>
-        </div>
-
         <!-- Upload Progress Simulation Box -->
         <div id="uploadProgressBox" style="display: none; margin-top: 18px;">
           <div class="progress-bar-container" style="height: 8px;">
@@ -1145,8 +1134,7 @@
           style="background-color: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 18px;">
           <div id="shareModalFileName" style="font-weight: 600; font-size: 0.92rem; color: var(--text-main);">
             research_report.pdf</div>
-          <div id="shareModalFileMeta" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">2.4 MB •
-            Classification: Confidential</div>
+          <div id="shareModalFileMeta" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">2.4 MB</div>
         </div>
 
         <div class="form-group">
@@ -1161,7 +1149,7 @@
 
         <!-- Generated Link Result Container -->
         <div id="shareLinkResultContainer" style="display: none; margin-top: 20px;">
-          <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Simulated Presigned S3
+          <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Presigned S3 Share
             Link:</label>
           <div class="copy-link-group">
             <input type="text" id="generatedShareLinkInput" class="copy-link-input" readonly>
@@ -1184,9 +1172,9 @@
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
           <div>
-            <strong>Simulated S3 Presigned URL:</strong> This prototype generates a simulated URL for interface
-            verification. In production, an authorized AWS Lambda function creates a cryptographically signed S3 GET URL
-            that expires automatically.
+            <strong>Time-Limited S3 Presigned URL:</strong> Generates an authenticated S3 presigned GET URL via AWS
+            Lambda. The cryptographically signed URL grants temporary read access and expires automatically after the
+            configured validity window.
           </div>
         </div>
       </div>

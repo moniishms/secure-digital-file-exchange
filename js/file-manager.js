@@ -219,9 +219,6 @@ const FileManager = {
   async executeUpload() {
     if (!this.selectedFileForUpload) return;
 
-    const classificationSelect = document.getElementById('uploadClassification');
-    const classification = classificationSelect ? classificationSelect.value : 'Internal';
-
     const submitBtn = document.getElementById('startUploadBtn');
     const cancelBtn = document.getElementById('cancelUploadBtn');
     const progressBox = document.getElementById('uploadProgressBox');
@@ -236,7 +233,7 @@ const FileManager = {
     try {
       await FileService.uploadFile(
         this.selectedFileForUpload,
-        classification,
+        'Internal',
         (progress) => {
           if (progressBar) progressBar.style.width = `${progress.percentage}%`;
           if (progressPercent) progressPercent.textContent = `${progress.percentage}%`;

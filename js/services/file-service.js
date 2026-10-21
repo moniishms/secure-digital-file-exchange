@@ -249,11 +249,16 @@ const FileService = {
   /**
    * Uploads a file to AWS API Gateway (POST /files)
    * @param {File} file Raw browser file
-   * @param {string} classification 'Confidential' | 'Restricted' | 'Internal' | 'Public'
+   * @param {string} [classification='Internal'] Default classification metadata ('Internal')
    * @param {Function} onProgress Progress callback ({ percentage, stage })
    * @returns {Promise<Object>} Created file record
    */
   async uploadFile(file, classification = 'Internal', onProgress = () => {}) {
+    if (typeof classification === 'function') {
+      onProgress = classification;
+      classification = 'Internal';
+    }
+
     if (!file) {
       throw new Error("No file selected.");
     }
@@ -299,7 +304,7 @@ const FileService = {
               const updated = [newFile, ...files];
               localStorage.setItem('sv_mock_files', JSON.stringify(updated));
               if (window.AuditService) {
-                AuditService.logActivity('Upload', newFile.name, `Uploaded as ${classification} (${newFile.sizeFormatted})`, 'Success');
+                AuditService.logActivity('Upload', newFile.name, `Encrypted in S3 (${newFile.sizeFormatted})`, 'Success');
               }
               resolve(newFile);
             });

@@ -55,7 +55,7 @@ const SharingManager = {
       const fileNameEl = document.getElementById('shareModalFileName');
       const fileMetaEl = document.getElementById('shareModalFileMeta');
       if (fileNameEl) fileNameEl.textContent = target.name;
-      if (fileMetaEl) fileMetaEl.textContent = `${target.sizeFormatted} • Classification: ${target.classification}`;
+      if (fileMetaEl) fileMetaEl.textContent = target.sizeFormatted;
     }
 
     modal.classList.add('active');
@@ -96,14 +96,20 @@ const SharingManager = {
 
     try {
       const shareRecord = await SharingService.generateSecureLink(this.currentFileIdToShare, expiryMinutes);
+      const linkUrl = shareRecord.shareUrl || shareRecord.url || shareRecord.simulatedUrl || '';
 
-      if (linkInput) linkInput.value = shareRecord.simulatedUrl;
+      if (linkInput) linkInput.value = linkUrl;
       if (expiryNotice) expiryNotice.textContent = `Valid until: ${shareRecord.expiresDate} (${expiryMinutes} minutes TTL)`;
 
       if (linkResultBox) linkResultBox.style.display = 'block';
       if (generateBtn) generateBtn.style.display = 'none';
 
-      Toast.show('Secure Link Generated', `Temporary access link created with ${expiryMinutes}m validity.`, 'success');
+      const isSimulated = shareRecord.isSimulated || CONFIG.isMockMode();
+      Toast.show(
+        'Secure Link Generated',
+        isSimulated ? `Simulated demo link created with ${expiryMinutes}m validity.` : `Time-limited S3 presigned URL created with ${expiryMinutes}m validity.`,
+        isSimulated ? 'info' : 'success'
+      );
 
       // Update shared table if open
       this.render();
@@ -117,10 +123,10 @@ const SharingManager = {
   copyGeneratedLink() {
     const linkInput = document.getElementById('generatedShareLinkInput');
     const copyBtn = document.getElementById('copyShareLinkBtn');
-    if (!linkInput) return;
+    if (!linkInput || !linkInput.value) return;
 
     linkInput.select();
-    navigator.clipboard.writeText(linkInput.value).then(() => {
+    const onSuccess = () => {
       if (copyBtn) {
         copyBtn.innerHTML = `
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -134,16 +140,49 @@ const SharingManager = {
         }, 2200);
       }
       Toast.show('Copied to Clipboard', 'The secure temporary URL is ready to share.', 'info');
-    }).catch(() => {
-      document.execCommand('copy');
-      Toast.show('Copied', 'Link copied to clipboard', 'info');
-    });
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(linkInput.value).then(onSuccess).catch(() => {
+        try {
+          document.execCommand('copy');
+          onSuccess();
+        } catch (e) {
+          Toast.show('Copy Failed', 'Please select and copy the link manually.', 'error');
+        }
+      });
+    } else {
+      try {
+        document.execCommand('copy');
+        onSuccess();
+      } catch (e) {
+        Toast.show('Copy Failed', 'Please select and copy the link manually.', 'error');
+      }
+    }
   },
 
   async copyShareUrl(url) {
+    if (!url) return;
     navigator.clipboard.writeText(url).then(() => {
-      Toast.show('Copied to Clipboard', 'Temporary link copied.', 'info');
+      Toast.show('Copied to Clipboard', 'Temporary S3 presigned link copied.', 'info');
+    }).catch(() => {
+      Toast.show('Copy Failed', 'Unable to copy URL to clipboard.', 'error');
     });
+  },
+
+  async copyShareLinkById(shareId) {
+    try {
+      const shares = await SharingService.listSharedFiles();
+      const target = shares.find(s => s.id === shareId);
+      const url = target?.shareUrl || target?.url || target?.simulatedUrl;
+      if (url) {
+        this.copyShareUrl(url);
+      } else {
+        Toast.show('Copy Error', 'Share URL not found.', 'error');
+      }
+    } catch (err) {
+      Toast.show('Copy Error', err.message, 'error');
+    }
   },
 
   async revokeShare(shareId) {
@@ -192,7 +231,7 @@ const SharingManager = {
               <div class="file-type-icon docx">URL</div>
               <div class="file-name-meta">
                 <div class="file-primary-name">${share.fileName}</div>
-                <div class="file-secondary-meta">${share.fileSize} • ${share.classification || 'Internal'}</div>
+                <div class="file-secondary-meta">${share.fileSize}</div>
               </div>
             </div>
           </td>
@@ -202,7 +241,7 @@ const SharingManager = {
           <td>
             <div class="action-buttons-group">
               ${canCopy ? `
-                <button class="action-btn share" title="Copy Link" onclick="SharingManager.copyShareUrl('${share.simulatedUrl}')">
+                <button class="action-btn share" title="Copy Link" onclick="SharingManager.copyShareLinkById('${share.id}')">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
               ` : `
