@@ -3,6 +3,11 @@
  * 
  * Manages the Secure Link Generation Modal, clipboard copying,
  * and the Shared Files management table view with real-time revocation.
+ * 
+ * Security:
+ * - Prevents opening the share modal for unauthenticated users or files outside the user's partition.
+ * - Handles expired links with appropriate visual indicators and disabled actions.
+ * - Confines share display strictly to the authenticated user.
  */
 
 const SharingManager = {
@@ -41,27 +46,43 @@ const SharingManager = {
   },
 
   async openShareModal(fileId) {
+    if (!CONFIG.isMockMode() && !AuthService.isAuthenticated()) {
+      Toast.show('Authentication Required', 'Please sign in with Amazon Cognito before sharing files.', 'warning');
+      return;
+    }
+
     this.currentFileIdToShare = fileId;
     const modal = document.getElementById('shareModal');
     if (!modal) return;
 
     this.resetShareModal();
 
-    // Fetch file details
-    const files = await FileService.listFiles();
-    const target = files.find(f => f.id === fileId);
+    // Verify target file exists in the authenticated user's vault
+    try {
+      const files = await FileService.listFiles();
+      const target = files.find(f => (f.id === fileId || f.fileId === fileId));
 
-    if (target) {
+      if (!target) {
+        Toast.show('File Not Found', 'Target file was not found in your vault partition.', 'error');
+        this.currentFileIdToShare = null;
+        return;
+      }
+
       const fileNameEl = document.getElementById('shareModalFileName');
       const fileMetaEl = document.getElementById('shareModalFileMeta');
       if (fileNameEl) fileNameEl.textContent = target.name;
       if (fileMetaEl) fileMetaEl.textContent = target.sizeFormatted;
+    } catch (err) {
+      Toast.show('Error', err.message, 'error');
+      this.currentFileIdToShare = null;
+      return;
     }
 
     modal.classList.add('active');
   },
 
   resetShareModal() {
+    this.currentFileIdToShare = null;
     const linkResultBox = document.getElementById('shareLinkResultContainer');
     const generateBtn = document.getElementById('generateLinkBtn');
     const linkInput = document.getElementById('generatedShareLinkInput');
@@ -82,7 +103,10 @@ const SharingManager = {
   },
 
   async executeGenerateLink() {
-    if (!this.currentFileIdToShare) return;
+    if (!this.currentFileIdToShare) {
+      Toast.show('Error', 'No file selected for sharing.', 'error');
+      return;
+    }
 
     const validitySelect = document.getElementById('shareValiditySelect');
     const expiryMinutes = validitySelect ? parseInt(validitySelect.value, 10) : 15;
@@ -174,6 +198,14 @@ const SharingManager = {
     try {
       const shares = await SharingService.listSharedFiles();
       const target = shares.find(s => s.id === shareId);
+      if (target?.status === 'Expired') {
+        Toast.show('Link Expired', 'This sharing link has expired and is no longer usable.', 'warning');
+        return;
+      }
+      if (target?.status === 'Revoked') {
+        Toast.show('Link Revoked', 'This sharing link has been revoked.', 'warning');
+        return;
+      }
       const url = target?.shareUrl || target?.url || target?.simulatedUrl;
       if (url) {
         this.copyShareUrl(url);
@@ -200,6 +232,24 @@ const SharingManager = {
     const tableBody = document.getElementById('sharedTableBody');
     const emptyState = document.getElementById('sharedEmptyState');
     if (!tableBody) return;
+
+    if (!CONFIG.isMockMode() && !AuthService.isAuthenticated()) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align: center; padding: 40px 16px;">
+            <div style="color: var(--primary-blue); font-weight: 600; font-size: 0.95rem; margin-bottom: 6px;">
+              Cognito Authentication Required
+            </div>
+            <div style="font-size: 0.84rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 16px auto; line-height: 1.5;">
+              Sign in with Amazon Cognito to view and manage your secure sharing links.
+            </div>
+            <button type="button" class="btn btn-primary btn-sm btn-login-cognito" onclick="AuthService.login()">Sign In with Cognito</button>
+          </td>
+        </tr>
+      `;
+      if (emptyState) emptyState.style.display = 'none';
+      return;
+    }
 
     const shares = await SharingService.listSharedFiles();
 

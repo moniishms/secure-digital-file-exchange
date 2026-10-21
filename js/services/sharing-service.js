@@ -3,10 +3,12 @@
  * 
  * Manages time-limited secure shareable links.
  * 
- * Backend Architecture Context:
- * - Current deployed API Gateway (SecureVaultAPI) routes: GET /files, POST /files, DELETE /files/{fileId}.
- * - Generating real temporary S3 presigned URLs requires a backend route (such as POST /files/{fileId}/share or POST /shares).
- * - Live AWS mode strictly avoids simulating fake S3 presigned URLs.
+ * Security:
+ * - Scopes browser storage strictly by the verified Cognito user's stable 'sub'.
+ * - Never shares localStorage records between different Cognito accounts in the same browser.
+ * - In Live AWS mode, strictly isolates share history and never displays mock/default shares.
+ * - Real temporary S3 presigned URLs are generated via API Gateway POST /files/{fileId}/share.
+ * - Dynamic expiration check automatically marks expired presigned links.
  */
 
 const SharingService = {
@@ -22,6 +24,7 @@ const SharingService = {
       expiryMinutes: 5,
       status: "Expired",
       simulatedUrl: "https://securevault-files-2026-ms-7391.s3.ap-south-1.amazonaws.com/shares/research_report.pdf?X-Amz-Expires=300",
+      isSimulated: true,
       revoked: false
     },
     {
@@ -35,9 +38,27 @@ const SharingService = {
       expiryMinutes: 5,
       status: "Active",
       simulatedUrl: "https://securevault-files-2026-ms-7391.s3.ap-south-1.amazonaws.com/shares/project_proposal.docx?X-Amz-Expires=300",
+      isSimulated: true,
       revoked: false
     }
   ],
+
+  /**
+   * Resolves the storage key for share records:
+   * - Mock mode: 'sv_mock_shares'
+   * - Live AWS mode: strictly scoped to the authenticated Cognito user's stable 'sub'
+   * - Unauthenticated in Live mode: returns null to prevent data cross-contamination
+   */
+  getStorageKey() {
+    if (CONFIG.isMockMode()) {
+      return 'sv_mock_shares';
+    }
+    const user = (window.AuthService && typeof AuthService.getCurrentUser === 'function')
+      ? AuthService.getCurrentUser()
+      : null;
+    const sub = user?.sub || (user?.id && user.id !== 'usr_cognito' ? user.id : null);
+    return sub ? `sv_live_shares_${sub}` : null;
+  },
 
   /**
    * Calculates formatted expiration date string in local time
@@ -65,10 +86,15 @@ const SharingService = {
   },
 
   /**
-   * Retrieves list of all shared links
+   * Retrieves list of all shared links strictly for the current authenticated user
    * @returns {Promise<Array>}
    */
   async listSharedFiles() {
+    // Purge legacy un-scoped storage key to eliminate cross-account data leaks
+    try {
+      localStorage.removeItem('sv_live_shares');
+    } catch (e) {}
+
     if (CONFIG.isMockMode()) {
       const stored = localStorage.getItem('sv_mock_shares');
       if (stored) {
@@ -82,16 +108,60 @@ const SharingService = {
       return [...this._defaultShares];
     }
 
-    // In Live Mode: only show links if a dedicated backend route is deployed
-    const stored = localStorage.getItem('sv_live_shares');
+    // Live AWS Mode:
+    // Strictly isolate shares by current user's authenticated sub.
+    // Never show mock/default share records in live AWS mode.
+    if (!AuthService.isAuthenticated()) {
+      return [];
+    }
+
+    const storageKey = this.getStorageKey();
+    if (!storageKey) {
+      return [];
+    }
+
+    const stored = localStorage.getItem(storageKey);
+    let shares = [];
     if (stored) {
       try {
-        return JSON.parse(stored);
+        shares = JSON.parse(stored);
+        if (!Array.isArray(shares)) shares = [];
       } catch (e) {
         console.error("Error parsing stored live shares", e);
+        shares = [];
       }
     }
-    return [];
+
+    // Filter to ensure no mock records or mismatched account records appear
+    const currentUser = AuthService.getCurrentUser();
+    const currentSub = currentUser?.sub;
+    shares = shares.filter(s => {
+      if (s.id === 'share_s01' || s.id === 'share_s02') return false;
+      if (s.isSimulated) return false;
+      if (s.ownerSub && currentSub && s.ownerSub !== currentSub) return false;
+      return true;
+    });
+
+    // Dynamically evaluate expiration
+    const now = Date.now();
+    let updatedNeeded = false;
+    shares.forEach(share => {
+      if (share.status === 'Active' && share.expiresDate) {
+        const expTime = new Date(share.expiresDate).getTime();
+        if (!isNaN(expTime) && expTime <= now) {
+          share.status = 'Expired';
+          updatedNeeded = true;
+        }
+      }
+    });
+
+    if (updatedNeeded) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(shares));
+      } catch (e) {}
+    }
+
+    return shares;
   },
 
   /**
@@ -106,8 +176,8 @@ const SharingService = {
     }
 
     const minutesNum = parseInt(expiryMinutes, 10) || 15;
-    const cleanFileId = (fileId.includes('/'))
-      ? fileId.split('/').pop().trim()
+    const cleanFileId = (fileId.includes('/') || fileId.includes('\\'))
+      ? fileId.replace(/\\/g, '/').split('/').pop().trim()
       : fileId.trim();
 
     if (!cleanFileId || cleanFileId === '.' || cleanFileId === '..') {
@@ -175,6 +245,11 @@ const SharingService = {
     const token = AuthService.getAuthToken();
     if (!token) {
       throw new Error("Valid authentication token missing: Please sign in with Amazon Cognito.");
+    }
+
+    const storageKey = this.getStorageKey();
+    if (!storageKey) {
+      throw new Error("Unable to determine user-scoped storage key. Please re-authenticate.");
     }
 
     // 2. Request real S3 presigned GET URL from API Gateway POST /files/{fileId}/share
@@ -246,10 +321,11 @@ const SharingService = {
       // Continue even if listFiles fails
     }
 
-    const resolvedFileName = data.filename || (targetFile ? targetFile.name : cleanFileId.replace(/^\d+-/, ''));
+    const resolvedFileName = data.filename || (targetFile ? targetFile.name : cleanFileId.replace(/^\d+-(?:[a-f0-9]+-)?/, ''));
     const resolvedFileSize = targetFile ? targetFile.sizeFormatted : 'Encrypted File';
     const resolvedClassification = targetFile ? targetFile.classification : 'Internal';
     const expiresDate = data.expiresDate ? this.formatIsoDate(data.expiresDate, minutesNum) : this.getExpirationDateString(minutesNum);
+    const currentUser = AuthService.getCurrentUser();
 
     const newShare = {
       id: "share_" + Math.random().toString(36).substring(2, 9),
@@ -265,12 +341,13 @@ const SharingService = {
       simulatedUrl: presignedShareUrl,
       url: presignedShareUrl,
       isSimulated: false,
-      revoked: false
+      revoked: false,
+      ownerSub: currentUser?.sub || null
     };
 
     const shares = await this.listSharedFiles();
     const updated = [newShare, ...shares];
-    localStorage.setItem('sv_live_shares', JSON.stringify(updated));
+    localStorage.setItem(storageKey, JSON.stringify(updated));
 
     if (window.AuditService) {
       window.AuditService.logActivity(
@@ -290,7 +367,10 @@ const SharingService = {
    * @returns {Promise<boolean>}
    */
   async revokeShare(shareId) {
-    const storageKey = CONFIG.isMockMode() ? 'sv_mock_shares' : 'sv_live_shares';
+    const storageKey = this.getStorageKey();
+    if (!storageKey) {
+      throw new Error("Authentication required: Cannot revoke share link without an active session.");
+    }
     const shares = await this.listSharedFiles();
     const targetIndex = shares.findIndex(s => s.id === shareId);
 
@@ -315,11 +395,17 @@ const SharingService = {
   },
 
   /**
-   * Resets mock shares to default
+   * Resets mock shares to default; in Live mode purges user share history
    */
   resetToDefaults() {
     localStorage.setItem('sv_mock_shares', JSON.stringify(this._defaultShares));
-    localStorage.removeItem('sv_live_shares');
+    try {
+      localStorage.removeItem('sv_live_shares');
+      const storageKey = this.getStorageKey();
+      if (storageKey && !CONFIG.isMockMode()) {
+        localStorage.removeItem(storageKey);
+      }
+    } catch (e) {}
     return [...this._defaultShares];
   }
 };

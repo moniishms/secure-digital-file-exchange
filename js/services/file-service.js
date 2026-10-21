@@ -145,8 +145,8 @@ const FileService = {
 
     let filename = apiFile.filename || apiFile.name;
     if (!filename && rawKey) {
-      const base = rawKey.split('/').pop();
-      filename = base.replace(/^\d+-/, ''); // strip timestamp prefix for cleaner display if present
+      const base = rawKey.replace(/\\/g, '/').split('/').pop();
+      filename = base.replace(/^\d+-(?:[a-f0-9]+-)?/, ''); // strip timestamp and entropy prefix for clean display
     }
     if (!filename) filename = 'Untitled';
 
@@ -411,11 +411,10 @@ const FileService = {
       throw new Error("Valid authentication token missing: Please sign in with Amazon Cognito.");
     }
 
-    // Slashes (%2F) in path parameters cause API Gateway HTTP API to normalize the path and fail route matching (HTTP 404).
-    // Ensure the path parameter is strictly a single path segment without slashes.
-    const cleanFileId = (typeof fileId === 'string' && fileId.includes('/'))
-      ? fileId.split('/').pop()
-      : fileId;
+    // Ensure the path parameter is strictly a single path segment without slashes or traversal
+    const cleanFileId = (typeof fileId === 'string' && (fileId.includes('/') || fileId.includes('\\')))
+      ? fileId.replace(/\\/g, '/').split('/').pop().trim()
+      : (typeof fileId === 'string' ? fileId.trim() : fileId);
 
     let response;
     try {
@@ -503,9 +502,9 @@ const FileService = {
     }
 
     // Extract clean single-segment fileId safe for API Gateway path parameters
-    const cleanFileId = (typeof fileId === 'string' && fileId.includes('/'))
-      ? fileId.split('/').pop()
-      : fileId;
+    const cleanFileId = (typeof fileId === 'string' && (fileId.includes('/') || fileId.includes('\\')))
+      ? fileId.replace(/\\/g, '/').split('/').pop().trim()
+      : (typeof fileId === 'string' ? fileId.trim() : fileId);
 
     let response;
     try {

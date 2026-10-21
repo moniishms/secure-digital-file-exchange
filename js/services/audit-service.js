@@ -70,15 +70,37 @@ const AuditService = {
   ],
 
   /**
-   * Retrieves all audit log entries
+   * Resolves storage key for audit activity logs:
+   * - Mock mode: 'sv_mock_logs'
+   * - Live mode: strictly scoped to the authenticated Cognito user's stable 'sub'
+   */
+  getStorageKey() {
+    if (CONFIG.isMockMode()) {
+      return 'sv_mock_logs';
+    }
+    const user = (window.AuthService && typeof AuthService.getCurrentUser === 'function')
+      ? AuthService.getCurrentUser()
+      : null;
+    const sub = user?.sub || (user?.id && user.id !== 'usr_cognito' ? user.id : null);
+    return sub ? `sv_live_logs_${sub}` : 'sv_live_logs_guest';
+  },
+
+  /**
+   * Retrieves all audit log entries strictly for the current user session
    * @returns {Promise<Array>}
    */
   async getAuditLogs() {
-    const storageKey = CONFIG.isMockMode() ? 'sv_mock_logs' : 'sv_live_logs';
+    // Purge legacy un-scoped key
+    try {
+      localStorage.removeItem('sv_live_logs');
+    } catch (e) {}
+
+    const storageKey = this.getStorageKey();
     const stored = localStorage.getItem(storageKey);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error("Error reading stored logs", e);
       }
@@ -89,19 +111,20 @@ const AuditService = {
       return [...this._defaultLogs];
     }
 
-    // In Live Mode, seed with initial session notice if empty
+    // In Live Mode, seed with initial session notice for this account if empty
+    const user = window.AuthService ? AuthService.getCurrentUser() : null;
     const initialLiveLogs = [
       {
         id: "log_live_01",
         action: "System Init",
         fileName: "SecureFileExchangeAPI",
-        user: "System",
+        user: user?.name || "Authenticated User",
         timestamp: FileService.getCurrentTimestamp ? FileService.getCurrentTimestamp() : new Date().toISOString().replace('T', ' ').slice(0, 16),
         status: "Success",
         details: "Live AWS Backend active (ap-south-1). CloudWatch audit group: /secure-file-sharing/audit"
       }
     ];
-    localStorage.setItem('sv_live_logs', JSON.stringify(initialLiveLogs));
+    localStorage.setItem(storageKey, JSON.stringify(initialLiveLogs));
     return initialLiveLogs;
   },
 
@@ -128,7 +151,7 @@ const AuditService = {
       details: details || "Action executed via SecureVault client"
     };
 
-    const storageKey = CONFIG.isMockMode() ? 'sv_mock_logs' : 'sv_live_logs';
+    const storageKey = this.getStorageKey();
     const logs = await this.getAuditLogs();
     const updated = [newLog, ...logs];
     localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -181,7 +204,13 @@ const AuditService = {
    */
   resetToDefaults() {
     localStorage.setItem('sv_mock_logs', JSON.stringify(this._defaultLogs));
-    localStorage.removeItem('sv_live_logs');
+    try {
+      localStorage.removeItem('sv_live_logs');
+      const storageKey = this.getStorageKey();
+      if (storageKey && !CONFIG.isMockMode()) {
+        localStorage.removeItem(storageKey);
+      }
+    } catch (e) {}
     return [...this._defaultLogs];
   }
 };

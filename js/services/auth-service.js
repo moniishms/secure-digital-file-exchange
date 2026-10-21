@@ -222,12 +222,22 @@ const AuthService = {
         Toast.show('Login Successful', `Authenticated as ${userProfile.name || userProfile.email}`, 'success');
       }
 
-      // Re-render UI
+      // Clear any prior account-specific in-memory state
+      if (window.FileManager) {
+        FileManager.fileIdToDelete = null;
+        FileManager.selectedFileForUpload = null;
+      }
+      if (window.SharingManager) {
+        SharingManager.currentFileIdToShare = null;
+      }
+
+      // Re-render UI across all modules
       if (window.App) {
         App.renderUserProfile();
         App.renderDashboard();
       }
       if (window.FileManager) FileManager.render();
+      if (window.SharingManager) SharingManager.render();
       if (window.ActivityManager) {
         ActivityManager.render();
         AuditService.logActivity('Login', 'Session Started', `User ${userProfile.email} authenticated via Cognito PKCE`, 'Success');
@@ -494,10 +504,12 @@ const AuthService = {
       App.renderDashboard();
     }
     if (window.FileManager) FileManager.render();
+    if (window.SharingManager) SharingManager.render();
+    if (window.ActivityManager) ActivityManager.render();
   },
 
   /**
-   * Clears tokens and cached user claims
+   * Clears tokens, cached user claims, and account-specific in-memory state
    */
   clearSession() {
     localStorage.removeItem('sv_id_token');
@@ -505,6 +517,18 @@ const AuthService = {
     localStorage.removeItem('sv_refresh_token');
     localStorage.removeItem('sv_token_expires_at');
     localStorage.removeItem('sv_cognito_user');
+    try {
+      localStorage.removeItem('sv_live_shares');
+    } catch (e) {}
+
+    // Clear account-specific in-memory UI state
+    if (window.FileManager) {
+      FileManager.fileIdToDelete = null;
+      FileManager.selectedFileForUpload = null;
+    }
+    if (window.SharingManager) {
+      SharingManager.currentFileIdToShare = null;
+    }
   },
 
   /**
@@ -523,7 +547,11 @@ const AuthService = {
     }
     if (window.App) {
       App.renderUserProfile();
+      App.renderDashboard();
     }
+    if (window.FileManager) FileManager.render();
+    if (window.SharingManager) SharingManager.render();
+    if (window.ActivityManager) ActivityManager.render();
   },
 
   /**

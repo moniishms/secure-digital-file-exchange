@@ -12,14 +12,16 @@
  * - Derives user identity strictly from verified Cognito JWT claims (sub).
  * - Never trusts client-supplied user IDs or full S3 paths for authorization.
  * - Confines all S3 operations to the authenticated user's prefix: users/{userId}/.
- * - Verifies file ownership and existence prior to generating share links.
- * - Prevents path traversal vulnerabilities using path.basename.
- * - S3 bucket remains strictly private; downloads use temporary (300s) presigned URLs.
+ * - Verifies file ownership and existence strictly via HeadObject prior to generating download/share links or deleting.
+ * - Prevents path traversal vulnerabilities using robust sanitization across Windows and POSIX separators.
+ * - Generates globally unique file IDs incorporating timestamp and cryptographic entropy.
+ * - S3 bucket remains strictly private; downloads and shares use temporary presigned URLs.
  */
 
 import { S3Client, ListObjectsV2Command, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import path from 'path';
+import crypto from 'crypto';
 
 const s3 = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'securevault-files-2026-ms-7391';
@@ -36,9 +38,42 @@ function getCorsHeaders(event) {
   };
 }
 
-export const handler = async (event) => {
+/**
+ * Sanitizes a client-supplied file identifier to prevent path traversal and ensure a single clean segment.
+ * Rejects traversal characters ('..', '/', '\\') and empty values.
+ */
+function sanitizeFileId(rawFileId) {
+  if (!rawFileId || typeof rawFileId !== 'string') return null;
+  const decoded = decodeURIComponent(rawFileId);
+  // Normalize both POSIX and Windows path separators before extracting the basename
+  const clean = path.basename(decoded.replace(/\\/g, '/')).trim();
+  if (!clean || clean === '.' || clean === '..' || clean.includes('/') || clean.includes('\\')) {
+    return null;
+  }
+  return clean;
+}
+
+/**
+ * Verifies that a file exists strictly within the authenticated user's private S3 partition.
+ */
+async function verifyFileOwnership(s3Client, bucket, userId, cleanFileId) {
+  const s3Key = `users/${userId}/${cleanFileId}`;
+  try {
+    const headCmd = new HeadObjectCommand({
+      Bucket: bucket,
+      Key: s3Key
+    });
+    await s3Client.send(headCmd);
+    return { exists: true, s3Key };
+  } catch (err) {
+    return { exists: false, s3Key, error: err };
+  }
+}
+
+export const handler = async (event, context = {}, clientOverride = null) => {
   const CORS_HEADERS = getCorsHeaders(event);
   const method = event.requestContext?.http?.method || event.httpMethod;
+  const activeS3 = clientOverride || s3;
 
   // 1. CORS Preflight
   if (method === 'OPTIONS') {
@@ -74,7 +109,7 @@ export const handler = async (event) => {
         Prefix: prefix
       });
 
-      const s3Response = await s3.send(listCmd);
+      const s3Response = await activeS3.send(listCmd);
       const objects = s3Response.Contents || [];
 
       const files = objects
@@ -82,7 +117,7 @@ export const handler = async (event) => {
         .map((obj) => {
           // File identifier is the single path segment within the user's partition
           const fileId = obj.Key.split('/').pop() || 'Untitled';
-          const displayName = fileId.replace(/^\d+-/, '');
+          const displayName = fileId.replace(/^\d+-(?:[a-f0-9]+-)?/, '');
 
           return {
             id: fileId,
@@ -114,29 +149,26 @@ export const handler = async (event) => {
         if (match) rawFileId = match[1];
       }
 
-      if (!rawFileId) {
+      const cleanFileId = sanitizeFileId(rawFileId);
+      if (!cleanFileId) {
         return {
           statusCode: 400,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ message: 'fileId parameter is required' })
+          body: JSON.stringify({ message: 'Invalid or missing fileId parameter' })
         };
       }
 
-      // Sanitize: decode percent-encoding and strip directory path traversal
-      const decoded = decodeURIComponent(rawFileId);
-      const cleanFileId = path.basename(decoded);
-
-      if (!cleanFileId || cleanFileId === '.' || cleanFileId === '..') {
+      // Verify file ownership and existence strictly within the authenticated user's partition
+      const { exists, s3Key } = await verifyFileOwnership(activeS3, BUCKET_NAME, userId, cleanFileId);
+      if (!exists) {
         return {
-          statusCode: 400,
+          statusCode: 404,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ message: 'Invalid fileId' })
+          body: JSON.stringify({ message: 'File not found in your vault partition' })
         };
       }
 
-      // Construct S3 key strictly locked to authenticated user partition
-      const s3Key = `users/${userId}/${cleanFileId}`;
-      const downloadFilename = cleanFileId.replace(/^\d+-/, '');
+      const downloadFilename = cleanFileId.replace(/^\d+-(?:[a-f0-9]+-)?/, '');
 
       // Generate a short-lived presigned GET URL (300 seconds = 5 minutes)
       const getCmd = new GetObjectCommand({
@@ -145,7 +177,7 @@ export const handler = async (event) => {
         ResponseContentDisposition: `attachment; filename="${downloadFilename}"`
       });
 
-      const downloadUrl = await getSignedUrl(s3, getCmd, { expiresIn: 300 });
+      const downloadUrl = await getSignedUrl(activeS3, getCmd, { expiresIn: 300 });
 
       return {
         statusCode: 200,
@@ -171,30 +203,26 @@ export const handler = async (event) => {
         if (match) rawFileId = match[1];
       }
 
-      if (!rawFileId) {
+      const cleanFileId = sanitizeFileId(rawFileId);
+      if (!cleanFileId) {
         return {
           statusCode: 400,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ message: 'fileId parameter is required' })
+          body: JSON.stringify({ message: 'Invalid or missing fileId parameter' })
         };
       }
 
-      // Sanitize: decode percent-encoding and strip directory path traversal
-      const decoded = decodeURIComponent(rawFileId);
-      const cleanFileId = path.basename(decoded);
-
-      if (!cleanFileId || cleanFileId === '.' || cleanFileId === '..') {
+      // Verify file ownership and existence strictly within the authenticated user's partition
+      const { exists, s3Key } = await verifyFileOwnership(activeS3, BUCKET_NAME, userId, cleanFileId);
+      if (!exists) {
         return {
-          statusCode: 400,
+          statusCode: 404,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ message: 'Invalid fileId' })
+          body: JSON.stringify({ message: 'File not found in your vault partition' })
         };
       }
 
-      // User isolation: Construct S3 key strictly locked to authenticated user partition.
-      // Never trust client-supplied S3 key or user ID!
-      const s3Key = `users/${userId}/${cleanFileId}`;
-      const downloadFilename = cleanFileId.replace(/^\d+-/, '');
+      const downloadFilename = cleanFileId.replace(/^\d+-(?:[a-f0-9]+-)?/, '');
 
       // Parse and validate requested validity period
       let body = {};
@@ -235,24 +263,6 @@ export const handler = async (event) => {
         expirySeconds = MAX_EXPIRY_SECONDS;
       }
 
-      // Verify file existence in the user's partition before generating presigned URL
-      try {
-        const headCmd = new HeadObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: s3Key
-        });
-        await s3.send(headCmd);
-      } catch (headErr) {
-        if (headErr.name === 'NotFound' || headErr.$metadata?.httpStatusCode === 404) {
-          return {
-            statusCode: 404,
-            headers: CORS_HEADERS,
-            body: JSON.stringify({ message: 'File not found in your vault partition' })
-          };
-        }
-        console.warn('HeadObject check returned error, continuing with presigned URL generation:', headErr.message);
-      }
-
       // Generate the time-limited presigned S3 GET URL
       const getCmd = new GetObjectCommand({
         Bucket: BUCKET_NAME,
@@ -260,7 +270,7 @@ export const handler = async (event) => {
         ResponseContentDisposition: `inline; filename="${downloadFilename}"`
       });
 
-      const shareUrl = await getSignedUrl(s3, getCmd, { expiresIn: expirySeconds });
+      const shareUrl = await getSignedUrl(activeS3, getCmd, { expiresIn: expirySeconds });
       const expiresDate = new Date(Date.now() + expirySeconds * 1000).toISOString();
 
       return {
@@ -291,7 +301,7 @@ export const handler = async (event) => {
       }
 
       const body = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body);
-      const rawFilename = path.basename(body.filename || 'upload.bin');
+      const rawFilename = path.basename((body.filename || 'upload.bin').replace(/\\/g, '/')).trim();
       const dataBase64 = body.dataBase64;
 
       if (!dataBase64) {
@@ -312,7 +322,9 @@ export const handler = async (event) => {
         };
       }
 
-      const fileId = `${Date.now()}-${rawFilename}`;
+      // Globally unique file ID: timestamp + cryptographically random UUID entropy + sanitized filename
+      const uniqueEntropy = crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).substring(2, 10);
+      const fileId = `${Date.now()}-${uniqueEntropy}-${rawFilename}`;
       const s3Key = `users/${userId}/${fileId}`;
 
       const putCmd = new PutObjectCommand({
@@ -322,7 +334,7 @@ export const handler = async (event) => {
         ServerSideEncryption: 'AES256'
       });
 
-      await s3.send(putCmd);
+      await activeS3.send(putCmd);
 
       return {
         statusCode: 201,
@@ -356,35 +368,31 @@ export const handler = async (event) => {
         } catch (e) {}
       }
 
-      if (!rawFileId) {
+      const cleanFileId = sanitizeFileId(rawFileId);
+      if (!cleanFileId) {
         return {
           statusCode: 400,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ message: 'fileId path parameter is required' })
+          body: JSON.stringify({ message: 'Invalid or missing fileId parameter' })
         };
       }
 
-      // Sanitize: decode percent-encoding and strip directory path traversal
-      const decoded = decodeURIComponent(rawFileId);
-      const cleanFileId = path.basename(decoded);
-
-      if (!cleanFileId || cleanFileId === '.' || cleanFileId === '..') {
+      // Verify file ownership and existence strictly within the authenticated user's partition
+      const { exists, s3Key } = await verifyFileOwnership(activeS3, BUCKET_NAME, userId, cleanFileId);
+      if (!exists) {
         return {
-          statusCode: 400,
+          statusCode: 404,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ message: 'Invalid fileId' })
+          body: JSON.stringify({ message: 'File not found in your vault partition' })
         };
       }
-
-      // Enforce authorization: lock S3 key strictly to authenticated user partition
-      const s3Key = `users/${userId}/${cleanFileId}`;
 
       const deleteCmd = new DeleteObjectCommand({
         Bucket: BUCKET_NAME,
         Key: s3Key
       });
 
-      await s3.send(deleteCmd);
+      await activeS3.send(deleteCmd);
 
       return {
         statusCode: 200,
@@ -414,3 +422,5 @@ export const handler = async (event) => {
     };
   }
 };
+
+export { sanitizeFileId, verifyFileOwnership, s3 };
