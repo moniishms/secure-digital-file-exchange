@@ -250,3 +250,8 @@ return await res.json();
 SecureVault demonstrates a real-world digital file exchange experience using a clean frontend prototype, AWS-oriented architecture, and security-first design language. It provides a strong foundation for future backend implementation, live cloud integration, and secure enterprise deployment.
 
 If you'd like, I can also clean up the README further into a more polished GitHub-style version with badges, screenshots, and a stronger project summary.
+
+## Project Citation
+
+Moniish M S, Ch Asrith, Pavan K, and S Vigneshwari,
+"SecureVault: Secure Digital File Exchange on AWS," 2026.
