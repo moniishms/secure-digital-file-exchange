@@ -230,9 +230,9 @@ return await res.json();
 
 | Module | Team Member | Status |
 |---|---|---|
-| Frontend UI & Integration | This prototype | Complete |
-| File Management Backend | Teammate 1 | Pending |
-| Cloud Security & Identity | Teammate 2 | Pending |
+| Backend and integration | Moniish M S | Complete |
+| Backend | Asrith C | Complete |
+| Frontend | Pavan K | Complete |
 
 ---
 
